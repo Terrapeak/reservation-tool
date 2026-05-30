@@ -59,6 +59,12 @@ async function checkAvailability(
 
   const maxGuestsPerSlot = 20
 
+console.log('DATE:', reservation_date)
+console.log('TIME:', reservation_time)
+console.log('FOUND BOOKINGS:', data)
+console.log('CURRENT GUESTS:', currentGuests)
+console.log('REQUESTED GUESTS:', requestedGuests)
+
   return (
     currentGuests + requestedGuests
     <=
@@ -76,6 +82,14 @@ function minutesToTime(minutes) {
   const mins = minutes % 60
 
   return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
+}
+
+function normalizeTime(time) {
+  if (time.length === 5) {
+    return `${time}:00`
+  }
+
+  return time
 }
 
 async function findAvailableSlots(reservation_date, requested_time, party_size) {
@@ -133,6 +147,14 @@ async function generateReservationReference(reservation_date) {
   return `DSD-${dateCode}-${paddedNumber}`
 }
 
+function isWithinOpeningHours(reservation_time) {
+  const openingTime = timeToMinutes('11:00')
+  const closingTime = timeToMinutes('22:00')
+  const requestedTime = timeToMinutes(reservation_time)
+
+  return requestedTime >= openingTime && requestedTime < closingTime
+}
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault()
 submitButton.disabled = true
@@ -146,6 +168,20 @@ submitButton.textContent = 'Creating Reservation...'
   const special_request = document.getElementById('request').value
 const reservation_reference =
   await generateReservationReference(reservation_date)
+if (!isWithinOpeningHours(reservation_time)) {
+  const message = document.getElementById('message')
+
+  message.innerHTML = `
+    <p style="color:red">
+      Sorry, reservations are only available from 11:00 AM to 10:00 PM.
+    </p>
+  `
+
+  submitButton.disabled = false
+  submitButton.textContent = 'Create Reservation'
+
+  return
+}
 
 const available =
   await checkAvailability(
