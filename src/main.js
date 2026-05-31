@@ -3,9 +3,37 @@ import { supabase } from './supabaseclient.js'
 
 const currentPage = window.location.pathname
 
+async function loadBranding() {
+  const { data, error } = await supabase
+    .from('restaurant_branding')
+    .select('*')
+    .limit(1)
+    .single()
+
+  if (error) {
+    console.error('Could not load branding:', error)
+    return {
+      restaurant_name: 'Dim Sum Dragon',
+      logo_url: '',
+      primary_color: '#b32626',
+      background_start: '#fff8ef',
+      background_end: '#f1dfcf'
+    }
+  }
+
+  document.documentElement.style.setProperty('--primary-color', data.primary_color)
+  document.documentElement.style.setProperty('--primary-dark-color', data.primary_color)
+  document.documentElement.style.setProperty('--background-start', data.background_start)
+  document.documentElement.style.setProperty('--background-end', data.background_end)
+
+  return data
+}
+
 if (currentPage === '/') {
+  const branding = await loadBranding()
   document.querySelector('#app').innerHTML = `
-  <h1>Dim Sum Dragon Reservations</h1>
+  ${branding.logo_url ? `<img src="${branding.logo_url}" class="brand-logo" />` : ''}
+  <h1>${branding.restaurant_name} Reservations</h1>
 
   <form id="reservationForm">
     <input type="text" id="name" placeholder="Customer Name" required />
@@ -339,6 +367,7 @@ cancelForm.addEventListener('submit', async (e) => {
 }
 
 if (currentPage === '/admin') {
+  const branding = await loadBranding()
   const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD
 const enteredPassword = prompt('Enter admin password:')
 
@@ -349,7 +378,8 @@ if (enteredPassword !== adminPassword) {
   `
 } else {
   document.querySelector('#app').innerHTML = `
-    <h1>Dim Sum Dragon Admin Dashboard</h1>
+  ${branding.logo_url ? `<img src="${branding.logo_url}" class="brand-logo" />` : ''}
+  <h1>${branding.restaurant_name} Admin Dashboard</h1>
 
     <input 
   type="text" 
@@ -359,6 +389,14 @@ if (enteredPassword !== adminPassword) {
 
 <button id="searchButton">Search</button>
 <button id="refreshButton">Show All Reservations</button>
+<hr>
+
+<h2>Brand Settings</h2>
+
+<input type="file" id="logoUpload" accept="image/*" />
+<button id="uploadLogoButton">Upload Logo</button>
+
+<div id="brandingMessage"></div>
 
     <hr>
 
@@ -369,6 +407,9 @@ const refreshButton = document.getElementById('refreshButton')
 const searchButton = document.getElementById('searchButton')
 const searchReference = document.getElementById('searchReference')
 const adminReservations = document.getElementById('adminReservations')
+const logoUpload = document.getElementById('logoUpload')
+const uploadLogoButton = document.getElementById('uploadLogoButton')
+const brandingMessage = document.getElementById('brandingMessage')
 
 async function markReservationCompleted(reservationId) {
   const { error } = await supabase
@@ -545,6 +586,56 @@ adminReservations.addEventListener('click', async (e) => {
 
   refreshButton.addEventListener('click', loadAdminReservations)
   searchButton.addEventListener('click', searchReservationByReference)
+
+  async function uploadLogo() {
+  const file = logoUpload.files[0]
+
+  if (!file) {
+    brandingMessage.innerHTML = `
+      <p style="color:red">Please choose an image first.</p>
+    `
+    return
+  }
+
+  const fileName = `logo-${Date.now()}-${file.name}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('restaurant-logos')
+    .upload(fileName, file)
+
+  if (uploadError) {
+    console.error(uploadError)
+    brandingMessage.innerHTML = `
+      <p style="color:red">Logo upload failed.</p>
+    `
+    return
+  }
+
+  const { data: publicUrlData } = supabase.storage
+    .from('restaurant-logos')
+    .getPublicUrl(fileName)
+
+  const logoUrl = publicUrlData.publicUrl
+
+  const { error: updateError } = await supabase
+    .from('restaurant_branding')
+    .update({ logo_url: logoUrl })
+    .eq('id', branding.id)
+
+  if (updateError) {
+    console.error(updateError)
+    brandingMessage.innerHTML = `
+      <p style="color:red">Logo uploaded but branding update failed.</p>
+    `
+    return
+  }
+
+  brandingMessage.innerHTML = `
+    <p style="color:green">Logo uploaded successfully. Refresh page to see it.</p>
+  `
+}
+
+uploadLogoButton.addEventListener('click', uploadLogo)
 
   loadAdminReservations()
 }

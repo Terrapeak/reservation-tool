@@ -80,6 +80,14 @@ button {
   font-weight: bold;
 }
 
+.brand-logo {
+  display: block;
+  max-width: 140px;
+  max-height: 140px;
+  margin: 0 auto 20px auto;
+  object-fit: contain;
+}
+
 button:hover {
   background: var(--primary-dark-color);
 }
