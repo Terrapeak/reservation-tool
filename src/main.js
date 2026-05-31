@@ -1,7 +1,10 @@
 import './style.css'
-import { supabase } from './supabaseClient.js'
+import { supabase } from './supabaseclient.js'
 
-document.querySelector('#app').innerHTML = `
+const currentPage = window.location.pathname
+
+if (currentPage === '/') {
+  document.querySelector('#app').innerHTML = `
   <h1>Dim Sum Dragon Reservations</h1>
 
   <form id="reservationForm">
@@ -29,11 +32,25 @@ document.querySelector('#app').innerHTML = `
   <hr>
 
   <div id="message"></div>
+<hr>
+
+<h2>Cancel Reservation</h2>
+
+<form id="cancelForm">
+  <input type="text" id="cancelReference" placeholder="Reservation Reference" required />
+  <br /><br />
+
+  <button type="submit">Cancel Reservation</button>
+</form>
+
+<div id="cancelMessage"></div>
 
 `
 
 const form = document.getElementById('reservationForm')
 const submitButton = form.querySelector('button[type="submit"]')
+const cancelForm = document.getElementById('cancelForm')
+const cancelButton = cancelForm.querySelector('button[type="submit"]')
 
 async function checkAvailability(
   reservation_date,
@@ -260,3 +277,275 @@ if (!available) {
 submitButton.textContent = 'Create Reservation'
 })
 
+cancelForm.addEventListener('submit', async (e) => {
+  e.preventDefault()
+
+  cancelButton.disabled = true
+  cancelButton.textContent = 'Cancelling...'
+
+  const reservation_reference = document
+    .getElementById('cancelReference')
+    .value
+    .trim()
+
+  const { data, error } = await supabase
+    .from('reservations')
+    .update({ status: 'cancelled' })
+    .eq('reservation_reference', reservation_reference)
+    .eq('status', 'confirmed')
+    .select()
+
+  const cancelMessage = document.getElementById('cancelMessage')
+
+  if (error) {
+    console.error(error)
+    cancelMessage.innerHTML = `
+      <p style="color:red">
+        Could not cancel reservation. Please try again.
+      </p>
+    `
+
+    cancelButton.disabled = false
+    cancelButton.textContent = 'Cancel Reservation'
+
+    return
+  }
+
+  if (data.length === 0) {
+    cancelMessage.innerHTML = `
+      <p style="color:red">
+        No active reservation found with that reference number.
+      </p>
+    `
+
+    cancelButton.disabled = false
+    cancelButton.textContent = 'Cancel Reservation'
+
+    return
+  }
+
+  cancelMessage.innerHTML = `
+    <p style="color:green">
+      Reservation ${reservation_reference} has been cancelled.
+    </p>
+  `
+
+  cancelForm.reset()
+
+  cancelButton.disabled = false
+  cancelButton.textContent = 'Cancel Reservation'
+})
+
+}
+
+if (currentPage === '/admin') {
+  const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD
+const enteredPassword = prompt('Enter admin password:')
+
+if (enteredPassword !== adminPassword) {
+  document.querySelector('#app').innerHTML = `
+    <h1>Access Denied</h1>
+    <p>You are not authorized to view this page.</p>
+  `
+} else {
+  document.querySelector('#app').innerHTML = `
+    <h1>Dim Sum Dragon Admin Dashboard</h1>
+
+    <input 
+  type="text" 
+  id="searchReference" 
+  placeholder="Search by reference number"
+/>
+
+<button id="searchButton">Search</button>
+<button id="refreshButton">Show All Reservations</button>
+
+    <hr>
+
+    <div id="adminReservations">Loading reservations...</div>
+  `
+
+const refreshButton = document.getElementById('refreshButton')
+const searchButton = document.getElementById('searchButton')
+const searchReference = document.getElementById('searchReference')
+const adminReservations = document.getElementById('adminReservations')
+
+async function markReservationCompleted(reservationId) {
+  const { error } = await supabase
+    .from('reservations')
+    .update({ status: 'completed' })
+    .eq('id', reservationId)
+
+  if (error) {
+    console.error(error)
+    alert('Could not mark reservation as completed.')
+    return
+  }
+
+  loadAdminReservations()
+}
+
+async function markReservationNoShow(reservationId) {
+  const { error } = await supabase
+    .from('reservations')
+    .update({ status: 'no_show' })
+    .eq('id', reservationId)
+
+  if (error) {
+    console.error(error)
+    alert('Could not mark reservation as no show.')
+    return
+  }
+
+  loadAdminReservations()
+}
+
+  async function loadAdminReservations() {
+    const { data, error } = await supabase
+      .from('reservations')
+      .select('*')
+      .order('reservation_date', { ascending: true })
+      .order('reservation_time', { ascending: true })
+
+    if (error) {
+      console.error(error)
+      adminReservations.innerHTML = `
+        <p style="color:red">Could not load reservations.</p>
+      `
+      return
+    }
+
+    if (data.length === 0) {
+      adminReservations.innerHTML = '<p>No reservations found.</p>'
+      return
+    }
+
+    adminReservations.innerHTML = data.map((reservation) => `
+      <div style="border:1px solid #ccc; padding:12px; margin-bottom:10px; border-radius:8px;">
+        <strong>${reservation.reservation_reference || 'No reference'}</strong><br>
+        Name: ${reservation.customer_name}<br>
+        Phone: ${reservation.phone}<br>
+        Date: ${reservation.reservation_date}<br>
+        Time: ${reservation.reservation_time}<br>
+        Guests: ${reservation.party_size}<br>
+        Status:
+${
+  reservation.status === 'confirmed'
+    ? '<span style="color:green;font-weight:bold;">Confirmed</span>'
+    : reservation.status === 'cancelled'
+    ? '<span style="color:red;font-weight:bold;">Cancelled</span>'
+    : reservation.status === 'completed'
+    ? '<span style="color:blue;font-weight:bold;">Completed</span>'
+    : reservation.status === 'no_show'
+    ? '<span style="color:orange;font-weight:bold;">No Show</span>'
+    : reservation.status
+}
+<br>
+Request: ${reservation.special_request || 'None'}<br><br>
+
+${
+  reservation.status === 'confirmed'
+    ? `
+      <button class="complete-button" data-id="${reservation.id}">
+        Mark Arrived / Completed
+      </button>
+
+      <button class="noshow-button" data-id="${reservation.id}">
+        Mark No Show
+      </button>
+    `
+    : ''
+}
+</div>
+`).join('')
+  }
+
+  async function searchReservationByReference() {
+  const reference = searchReference.value.trim()
+
+  if (!reference) {
+    adminReservations.innerHTML = `
+      <p style="color:red">Please enter a reservation reference.</p>
+    `
+    return
+  }
+
+  const { data, error } = await supabase
+    .from('reservations')
+    .select('*')
+    .eq('reservation_reference', reference)
+
+  if (error) {
+    console.error(error)
+    adminReservations.innerHTML = `
+      <p style="color:red">Search failed.</p>
+    `
+    return
+  }
+
+  if (data.length === 0) {
+    adminReservations.innerHTML = `
+      <p>No reservation found for reference: <strong>${reference}</strong></p>
+    `
+    return
+  }
+
+  adminReservations.innerHTML = data.map((reservation) => `
+    <div style="border:1px solid #ccc; padding:12px; margin-bottom:10px; border-radius:8px;">
+      <strong>${reservation.reservation_reference || 'No reference'}</strong><br>
+      Name: ${reservation.customer_name}<br>
+      Phone: ${reservation.phone}<br>
+      Date: ${reservation.reservation_date}<br>
+      Time: ${reservation.reservation_time}<br>
+      Guests: ${reservation.party_size}<br>
+      Status:
+${
+  reservation.status === 'confirmed'
+    ? '<span style="color:green;font-weight:bold;">Confirmed</span>'
+    : reservation.status === 'cancelled'
+    ? '<span style="color:red;font-weight:bold;">Cancelled</span>'
+    : reservation.status === 'completed'
+    ? '<span style="color:blue;font-weight:bold;">Completed</span>'
+    : reservation.status
+}
+<br>
+Request: ${reservation.special_request || 'None'}<br><br>
+
+${
+  reservation.status === 'confirmed'
+    ? `
+      <button class="complete-button" data-id="${reservation.id}">
+        Mark Arrived / Completed
+      </button>
+
+      <button class="noshow-button" data-id="${reservation.id}">
+        Mark No Show
+      </button>
+    `
+    : ''
+}
+
+</div>
+`).join('')
+}
+
+adminReservations.addEventListener('click', async (e) => {
+
+  if (e.target.classList.contains('complete-button')) {
+    const reservationId = e.target.dataset.id
+    await markReservationCompleted(reservationId)
+  }
+
+  if (e.target.classList.contains('noshow-button')) {
+    const reservationId = e.target.dataset.id
+    await markReservationNoShow(reservationId)
+  }
+
+})
+
+  refreshButton.addEventListener('click', loadAdminReservations)
+  searchButton.addEventListener('click', searchReservationByReference)
+
+  loadAdminReservations()
+}
+}
