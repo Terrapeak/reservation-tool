@@ -381,6 +381,11 @@ if (enteredPassword !== adminPassword) {
   ${branding.logo_url ? `<img src="${branding.logo_url}" class="brand-logo" />` : ''}
   <h1>${branding.restaurant_name} Admin Dashboard</h1>
 
+  <div class="admin-nav">
+  <a href="/admin">Dashboard</a>
+  <a href="/admin/settings">Settings</a>
+  </div>
+
     <input 
   type="text" 
   id="searchReference" 
@@ -389,14 +394,6 @@ if (enteredPassword !== adminPassword) {
 
 <button id="searchButton">Search</button>
 <button id="refreshButton">Show All Reservations</button>
-<hr>
-
-<h2>Brand Settings</h2>
-
-<input type="file" id="logoUpload" accept="image/*" />
-<button id="uploadLogoButton">Upload Logo</button>
-
-<div id="brandingMessage"></div>
 
     <hr>
 
@@ -407,9 +404,6 @@ const refreshButton = document.getElementById('refreshButton')
 const searchButton = document.getElementById('searchButton')
 const searchReference = document.getElementById('searchReference')
 const adminReservations = document.getElementById('adminReservations')
-const logoUpload = document.getElementById('logoUpload')
-const uploadLogoButton = document.getElementById('uploadLogoButton')
-const brandingMessage = document.getElementById('brandingMessage')
 
 async function markReservationCompleted(reservationId) {
   const { error } = await supabase
@@ -635,8 +629,133 @@ adminReservations.addEventListener('click', async (e) => {
   `
 }
 
-uploadLogoButton.addEventListener('click', uploadLogo)
-
   loadAdminReservations()
 }
+}
+
+if (currentPage === '/admin/settings') {
+  const branding = await loadBranding()
+
+  const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD
+  const enteredPassword = prompt('Enter admin password:')
+
+  if (enteredPassword !== adminPassword) {
+    document.querySelector('#app').innerHTML = `
+      <h1>Access Denied</h1>
+      <p>You are not authorized to view this page.</p>
+    `
+  } else {
+    document.querySelector('#app').innerHTML = `
+      ${branding.logo_url ? `<img src="${branding.logo_url}" class="brand-logo" />` : ''}
+      <h1>${branding.restaurant_name} Settings</h1>
+
+      <div class="admin-nav">
+        <a href="/admin">Dashboard</a>
+        <a href="/admin/settings">Settings</a>
+      </div>
+
+      <form id="brandingForm">
+        <h2>Brand Settings</h2>
+
+        <input type="text" id="restaurantName" value="${branding.restaurant_name}" placeholder="Restaurant Name" />
+        <br /><br />
+
+        <label>Primary Color</label>
+        <input type="color" id="primaryColor" value="${branding.primary_color}" />
+        <br /><br />
+
+        <label>Background Start</label>
+        <input type="color" id="backgroundStart" value="${branding.background_start}" />
+        <br /><br />
+
+        <label>Background End</label>
+        <input type="color" id="backgroundEnd" value="${branding.background_end}" />
+        <br /><br />
+
+        <button type="submit">Save Brand Settings</button>
+      </form>
+
+      <form id="logoForm">
+        <h2>Logo Upload</h2>
+
+        <input type="file" id="logoUpload" accept="image/*" />
+        <br /><br />
+
+        <button type="submit">Upload Logo</button>
+      </form>
+
+      <div id="brandingMessage"></div>
+    `
+
+    const brandingForm = document.getElementById('brandingForm')
+    const logoForm = document.getElementById('logoForm')
+    const brandingMessage = document.getElementById('brandingMessage')
+
+    brandingForm.addEventListener('submit', async (e) => {
+      e.preventDefault()
+
+      const updatedBranding = {
+        restaurant_name: document.getElementById('restaurantName').value,
+        primary_color: document.getElementById('primaryColor').value,
+        background_start: document.getElementById('backgroundStart').value,
+        background_end: document.getElementById('backgroundEnd').value
+      }
+
+      const { error } = await supabase
+        .from('restaurant_branding')
+        .update(updatedBranding)
+        .eq('id', branding.id)
+
+      if (error) {
+        console.error(error)
+        brandingMessage.innerHTML = '<p style="color:red">Could not save brand settings.</p>'
+        return
+      }
+
+      brandingMessage.innerHTML = '<p style="color:green">Brand settings saved. Refresh page to see changes.</p>'
+    })
+
+    logoForm.addEventListener('submit', async (e) => {
+      e.preventDefault()
+
+      const logoUpload = document.getElementById('logoUpload')
+      const file = logoUpload.files[0]
+
+      if (!file) {
+        brandingMessage.innerHTML = '<p style="color:red">Please choose an image first.</p>'
+        return
+      }
+
+      const fileName = `logo-${Date.now()}-${file.name}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('restaurant-logos')
+        .upload(fileName, file)
+
+      if (uploadError) {
+        console.error(uploadError)
+        brandingMessage.innerHTML = '<p style="color:red">Logo upload failed.</p>'
+        return
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('restaurant-logos')
+        .getPublicUrl(fileName)
+
+      const logoUrl = publicUrlData.publicUrl
+
+      const { error: updateError } = await supabase
+        .from('restaurant_branding')
+        .update({ logo_url: logoUrl })
+        .eq('id', branding.id)
+
+      if (updateError) {
+        console.error(updateError)
+        brandingMessage.innerHTML = '<p style="color:red">Logo uploaded but branding update failed.</p>'
+        return
+      }
+
+      brandingMessage.innerHTML = '<p style="color:green">Logo uploaded successfully. Refresh page to see it.</p>'
+    })
+  }
 }

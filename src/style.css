@@ -119,3 +119,23 @@ hr {
   max-width: 320px;
   margin-bottom: 10px;
 }
+
+.admin-nav {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.admin-nav a {
+  display: inline-block;
+  margin: 0 8px;
+  color: white;
+  background: var(--primary-color);
+  padding: 10px 16px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.admin-nav a:hover {
+  background: var(--primary-dark-color);
+}
