@@ -139,3 +139,31 @@ hr {
 .admin-nav a:hover {
   background: var(--primary-dark-color);
 }
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin-bottom: 25px;
+}
+
+.summary-card {
+  background: var(--card-color);
+  border-radius: 14px;
+  padding: 18px;
+  text-align: center;
+  box-shadow: 0 5px 18px var(--shadow-color);
+  border-top: 5px solid var(--primary-color);
+}
+
+.summary-card h3 {
+  margin: 0 0 8px 0;
+  color: var(--primary-dark-color);
+  font-size: 15px;
+}
+
+.summary-card p {
+  margin: 0;
+  font-size: 30px;
+  font-weight: bold;
+}

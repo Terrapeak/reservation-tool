@@ -2,6 +2,39 @@ import './style.css'
 import { supabase } from './supabaseclient.js'
 
 const currentPage = window.location.pathname
+function isAdminLoggedIn() {
+  const loginExpiry = localStorage.getItem('adminLoginExpiry')
+
+  if (!loginExpiry) {
+    return false
+  }
+
+  return Date.now() < Number(loginExpiry)
+}
+
+function saveAdminLogin() {
+  const eightHours = 8 * 60 * 60 * 1000
+  const expiryTime = Date.now() + eightHours
+
+  localStorage.setItem('adminLoginExpiry', expiryTime)
+}
+
+function requireAdminPassword() {
+  const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD
+
+  if (isAdminLoggedIn()) {
+    return true
+  }
+
+  const enteredPassword = prompt('Enter admin password:')
+
+  if (enteredPassword === adminPassword) {
+    saveAdminLogin()
+    return true
+  }
+
+  return false
+}
 
 async function loadBranding() {
   const { data, error } = await supabase
@@ -25,6 +58,27 @@ async function loadBranding() {
   document.documentElement.style.setProperty('--primary-dark-color', data.primary_color)
   document.documentElement.style.setProperty('--background-start', data.background_start)
   document.documentElement.style.setProperty('--background-end', data.background_end)
+
+  return data
+}
+
+async function loadRestaurantSettings() {
+  const { data, error } = await supabase
+    .from('restaurant_settings')
+    .select('*')
+    .eq('id', 1)
+    .single()
+
+  if (error) {
+    console.error('Could not load restaurant settings:', error)
+
+    return {
+      opening_time: '11:00',
+      closing_time: '22:00',
+      max_guests_per_slot: 20,
+      default_duration_minutes: 90
+    }
+  }
 
   return data
 }
@@ -90,6 +144,7 @@ async function checkAvailability(
     .select('*')
     .eq('reservation_date', reservation_date)
     .eq('reservation_time', reservation_time)
+    .eq('status', 'confirmed')
 
   if (error) {
     console.error(error)
@@ -102,13 +157,8 @@ async function checkAvailability(
     0
   )
 
-  const maxGuestsPerSlot = 20
-
-console.log('DATE:', reservation_date)
-console.log('TIME:', reservation_time)
-console.log('FOUND BOOKINGS:', data)
-console.log('CURRENT GUESTS:', currentGuests)
-console.log('REQUESTED GUESTS:', requestedGuests)
+  const settings = await loadRestaurantSettings()
+  const maxGuestsPerSlot = settings.max_guests_per_slot
 
   return (
     currentGuests + requestedGuests
@@ -138,23 +188,20 @@ function normalizeTime(time) {
 }
 
 async function findAvailableSlots(reservation_date, requested_time, party_size) {
-  const openingTime = timeToMinutes('11:00')
-  const closingTime = timeToMinutes('22:00')
+  const settings = await loadRestaurantSettings()
+
+  const closingTime = timeToMinutes(settings.closing_time)
   const requestedMinutes = timeToMinutes(requested_time)
 
-  const possibleSlots = []
+  const availableSlots = []
 
   for (
     let minutes = requestedMinutes + 30;
     minutes < closingTime;
     minutes += 30
   ) {
-    possibleSlots.push(minutesToTime(minutes))
-  }
+    const slot = minutesToTime(minutes)
 
-  const availableSlots = []
-
-  for (const slot of possibleSlots) {
     const available = await checkAvailability(
       reservation_date,
       slot,
@@ -192,9 +239,11 @@ async function generateReservationReference(reservation_date) {
   return `DSD-${dateCode}-${paddedNumber}`
 }
 
-function isWithinOpeningHours(reservation_time) {
-  const openingTime = timeToMinutes('11:00')
-  const closingTime = timeToMinutes('22:00')
+async function isWithinOpeningHours(reservation_time) {
+  const settings = await loadRestaurantSettings()
+
+  const openingTime = timeToMinutes(settings.opening_time)
+  const closingTime = timeToMinutes(settings.closing_time)
   const requestedTime = timeToMinutes(reservation_time)
 
   return requestedTime >= openingTime && requestedTime < closingTime
@@ -211,9 +260,9 @@ submitButton.textContent = 'Creating Reservation...'
   const reservation_time = document.getElementById('time').value
   const party_size = parseInt(document.getElementById('guests').value)
   const special_request = document.getElementById('request').value
-const reservation_reference =
+  const reservation_reference =
   await generateReservationReference(reservation_date)
-if (!isWithinOpeningHours(reservation_time)) {
+if (!(await isWithinOpeningHours(reservation_time))) {
   const message = document.getElementById('message')
 
   message.innerHTML = `
@@ -368,10 +417,8 @@ cancelForm.addEventListener('submit', async (e) => {
 
 if (currentPage === '/admin') {
   const branding = await loadBranding()
-  const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD
-const enteredPassword = prompt('Enter admin password:')
 
-if (enteredPassword !== adminPassword) {
+  if (!requireAdminPassword()) {
   document.querySelector('#app').innerHTML = `
     <h1>Access Denied</h1>
     <p>You are not authorized to view this page.</p>
@@ -383,8 +430,9 @@ if (enteredPassword !== adminPassword) {
 
   <div class="admin-nav">
   <a href="/admin">Dashboard</a>
+  <a href="/admin/analytics">Analytics</a>
   <a href="/admin/settings">Settings</a>
-  </div>
+</div>
 
     <input 
   type="text" 
@@ -394,16 +442,42 @@ if (enteredPassword !== adminPassword) {
 
 <button id="searchButton">Search</button>
 <button id="refreshButton">Show All Reservations</button>
+<br /><br />
 
-    <hr>
+<label>Select Date</label>
+<input type="date" id="adminDateFilter" />
+<button id="loadDateButton">Load Date</button>
+<br /><br />
 
-    <div id="adminReservations">Loading reservations...</div>
+<label>View</label>
+<button id="showActiveButton">Active</button>
+<button id="showArchivedButton">Archived</button>
+<button id="showAllButton">All</button>
+
+<hr>
+
+<div id="dashboardSummary"></div>
+
+<hr>
+
+<div id="adminReservations">Loading reservations...</div>
   `
 
 const refreshButton = document.getElementById('refreshButton')
 const searchButton = document.getElementById('searchButton')
 const searchReference = document.getElementById('searchReference')
 const adminReservations = document.getElementById('adminReservations')
+const dashboardSummary = document.getElementById('dashboardSummary')
+const adminDateFilter = document.getElementById('adminDateFilter')
+const loadDateButton = document.getElementById('loadDateButton')
+const showActiveButton = document.getElementById('showActiveButton')
+const showArchivedButton = document.getElementById('showArchivedButton')
+const showAllButton = document.getElementById('showAllButton')
+
+let selectedAdminDate = new Date().toISOString().split('T')[0]
+adminDateFilter.value = selectedAdminDate
+
+let adminViewMode = 'active'
 
 async function markReservationCompleted(reservationId) {
   const { error } = await supabase
@@ -418,6 +492,67 @@ async function markReservationCompleted(reservationId) {
   }
 
   loadAdminReservations()
+}
+
+function updateDashboardSummary(reservations) {
+  const selectedReservations = reservations.filter(
+    reservation => reservation.reservation_date === selectedAdminDate
+  )
+
+  const confirmed = selectedReservations.filter(
+    reservation => reservation.status === 'confirmed'
+  )
+
+  const cancelled = selectedReservations.filter(
+    reservation => reservation.status === 'cancelled'
+  )
+
+  const completed = selectedReservations.filter(
+    reservation => reservation.status === 'completed'
+  )
+
+  const noShows = selectedReservations.filter(
+    reservation => reservation.status === 'no_show'
+  )
+
+  const totalGuests = confirmed.reduce(
+    (total, reservation) => total + reservation.party_size,
+    0
+  )
+
+  dashboardSummary.innerHTML = `
+    <div class="summary-grid">
+      <div class="summary-card">
+        <h3>Reservations</h3>
+        <p>${selectedReservations.length}</p>
+      </div>
+
+      <div class="summary-card">
+        <h3>Guests Today</h3>
+        <p>${totalGuests}</p>
+      </div>
+
+      <div class="summary-card">
+        <h3>Confirmed</h3>
+        <p>${confirmed.length}</p>
+      </div>
+
+      <div class="summary-card">
+        <h3>Completed</h3>
+        <p>${completed.length}</p>
+      </div>
+
+      <div class="summary-card">
+        <h3>Cancelled</h3>
+        <p>${cancelled.length}</p>
+      </div>
+
+      <div class="summary-card">
+        <h3>No Shows</h3>
+        <p>${noShows.length}</p>
+      </div>
+    </div>
+  `
 }
 
 async function markReservationNoShow(reservationId) {
@@ -435,67 +570,173 @@ async function markReservationNoShow(reservationId) {
   loadAdminReservations()
 }
 
-  async function loadAdminReservations() {
-    const { data, error } = await supabase
-      .from('reservations')
-      .select('*')
-      .order('reservation_date', { ascending: true })
-      .order('reservation_time', { ascending: true })
+async function archiveReservation(reservationId) {
+  console.log('ARCHIVING ID:', reservationId)
 
-    if (error) {
-      console.error(error)
-      adminReservations.innerHTML = `
-        <p style="color:red">Could not load reservations.</p>
-      `
-      return
-    }
+  const { error } = await supabase
+    .from('reservations')
+    .update({ is_archived: true })
+    .eq('id', reservationId)
 
-    if (data.length === 0) {
-      adminReservations.innerHTML = '<p>No reservations found.</p>'
-      return
-    }
+  if (error) {
+    console.error(error)
+    alert('Could not archive reservation.')
+    return
+  }
 
-    adminReservations.innerHTML = data.map((reservation) => `
-      <div style="border:1px solid #ccc; padding:12px; margin-bottom:10px; border-radius:8px;">
-        <strong>${reservation.reservation_reference || 'No reference'}</strong><br>
-        Name: ${reservation.customer_name}<br>
-        Phone: ${reservation.phone}<br>
-        Date: ${reservation.reservation_date}<br>
-        Time: ${reservation.reservation_time}<br>
-        Guests: ${reservation.party_size}<br>
-        Status:
-${
-  reservation.status === 'confirmed'
-    ? '<span style="color:green;font-weight:bold;">Confirmed</span>'
-    : reservation.status === 'cancelled'
-    ? '<span style="color:red;font-weight:bold;">Cancelled</span>'
-    : reservation.status === 'completed'
-    ? '<span style="color:blue;font-weight:bold;">Completed</span>'
-    : reservation.status === 'no_show'
-    ? '<span style="color:orange;font-weight:bold;">No Show</span>'
-    : reservation.status
+    loadAdminReservations()
 }
-<br>
-Request: ${reservation.special_request || 'None'}<br><br>
+  async function restoreReservation(reservationId) {
+  const { error } = await supabase
+    .from('reservations')
+    .update({ is_archived: false })
+    .eq('id', reservationId)
 
-${
-  reservation.status === 'confirmed'
+  if (error) {
+    console.error(error)
+    alert('Could not restore reservation.')
+    return
+  }
+
+  loadAdminReservations()
+}
+
+async function deleteReservation(reservationId) {
+  const deletePassword = import.meta.env.VITE_DELETE_PASSWORD
+  const enteredPassword = prompt('Enter manager delete password:')
+
+  if (enteredPassword !== deletePassword) {
+    alert('Delete cancelled. Incorrect password.')
+    return
+  }
+
+  const confirmDelete = confirm(
+    'This will permanently delete the reservation. Are you sure?'
+  )
+
+  if (!confirmDelete) {
+    return
+  }
+
+  const { error } = await supabase
+    .from('reservations')
+    .delete()
+    .eq('id', reservationId)
+
+  if (error) {
+    console.error(error)
+    alert('Could not delete reservation.')
+    return
+  }
+
+  loadAdminReservations()
+}
+
+async function loadAdminReservations() {
+  let query = supabase
+  .from('reservations')
+  .select('*')
+  .eq('reservation_date', selectedAdminDate)
+  .order('reservation_time', { ascending: true })
+
+if (adminViewMode === 'active') {
+  query = query.eq('is_archived', false)
+}
+
+if (adminViewMode === 'archived') {
+  query = query.eq('is_archived', true)
+}
+
+const { data, error } = await query
+
+  if (error) {
+    console.error(error)
+    adminReservations.innerHTML = `
+      <p style="color:red">Could not load reservations.</p>
+    `
+    return
+  }
+
+  if (data.length === 0) {
+    adminReservations.innerHTML = '<p>No reservations found.</p>'
+    updateDashboardSummary([])
+    return
+  }
+
+  updateDashboardSummary(data)
+
+  adminReservations.innerHTML = data.map((reservation) => `
+    <div style="border:1px solid #ccc; padding:12px; margin-bottom:10px; border-radius:8px;">
+      <strong>${reservation.reservation_reference || 'No reference'}</strong><br>
+      Name: ${reservation.customer_name}<br>
+      Phone: ${reservation.phone}<br>
+      Date: ${reservation.reservation_date}<br>
+      Time: ${reservation.reservation_time}<br>
+      Guests: ${reservation.party_size}<br>
+      Status:
+      ${
+        reservation.status === 'confirmed'
+          ? '<span style="color:green;font-weight:bold;">Confirmed</span>'
+          : reservation.status === 'cancelled'
+          ? '<span style="color:red;font-weight:bold;">Cancelled</span>'
+          : reservation.status === 'completed'
+          ? '<span style="color:blue;font-weight:bold;">Completed</span>'
+          : reservation.status === 'no_show'
+          ? '<span style="color:orange;font-weight:bold;">No Show</span>'
+          : reservation.status
+      }
+
+      ${
+           reservation.is_archived
+            ? '<span style="color:gray;font-weight:bold;">Archived</span><br>'
+            : ''
+      }
+      <br>
+      Request: ${reservation.special_request || 'None'}<br><br>
+
+      ${
+        !reservation.is_archived
+          ? `
+            ${
+              reservation.status === 'confirmed'
+                ? `
+                  <button class="complete-button" data-id="${reservation.id}">
+                    Mark Arrived / Completed
+                  </button>
+
+                  <button class="noshow-button" data-id="${reservation.id}">
+                    Mark No Show
+                  </button>
+                `
+                : ''
+            }
+
+            <button class="archive-button" data-id="${reservation.id}">
+              Archive
+            </button>
+          `
+          : ''
+      }
+
+      ${
+  reservation.is_archived
     ? `
-      <button class="complete-button" data-id="${reservation.id}">
-        Mark Arrived / Completed
-      </button>
-
-      <button class="noshow-button" data-id="${reservation.id}">
-        Mark No Show
+      <button class="restore-button" data-id="${reservation.id}">
+        Restore
       </button>
     `
     : ''
 }
-</div>
-`).join('')
-  }
 
-  async function searchReservationByReference() {
+<button class="delete-button" data-id="${reservation.id}">
+  Manager Delete
+</button>
+
+    </div>
+  `).join('')
+}
+
+async function searchReservationByReference() {
   const reference = searchReference.value.trim()
 
   if (!reference) {
@@ -541,27 +782,45 @@ ${
     ? '<span style="color:red;font-weight:bold;">Cancelled</span>'
     : reservation.status === 'completed'
     ? '<span style="color:blue;font-weight:bold;">Completed</span>'
+    : reservation.status === 'no_show'
+    ? '<span style="color:orange;font-weight:bold;">No Show</span>'
     : reservation.status
 }
 <br>
-Request: ${reservation.special_request || 'None'}<br><br>
 
 ${
-  reservation.status === 'confirmed'
-    ? `
-      <button class="complete-button" data-id="${reservation.id}">
-        Mark Arrived / Completed
-      </button>
-
-      <button class="noshow-button" data-id="${reservation.id}">
-        Mark No Show
-      </button>
-    `
+  reservation.is_archived
+    ? '<span style="color:gray;font-weight:bold;">Archived</span><br>'
     : ''
 }
+      <br>
+      Request: ${reservation.special_request || 'None'}<br><br>
 
-</div>
-`).join('')
+      ${
+        !reservation.is_archived
+          ? `
+            ${
+              reservation.status === 'confirmed'
+                ? `
+                  <button class="complete-button" data-id="${reservation.id}">
+                    Mark Arrived / Completed
+                  </button>
+
+                  <button class="noshow-button" data-id="${reservation.id}">
+                    Mark No Show
+                  </button>
+                `
+                : ''
+            }
+
+            <button class="archive-button" data-id="${reservation.id}">
+              Archive
+            </button>
+          `
+          : ''
+      }
+    </div>
+  `).join('')
 }
 
 adminReservations.addEventListener('click', async (e) => {
@@ -576,70 +835,57 @@ adminReservations.addEventListener('click', async (e) => {
     await markReservationNoShow(reservationId)
   }
 
+if (e.target.classList.contains('archive-button')) {
+  const reservationId = e.target.dataset.id
+  await archiveReservation(reservationId)
+}
+
+if (e.target.classList.contains('restore-button')) {
+  const reservationId = e.target.dataset.id
+  await restoreReservation(reservationId)
+}
+
+if (e.target.classList.contains('delete-button')) {
+  const reservationId = e.target.dataset.id
+  await deleteReservation(reservationId)
+}
+
 })
 
   refreshButton.addEventListener('click', loadAdminReservations)
   searchButton.addEventListener('click', searchReservationByReference)
 
-  async function uploadLogo() {
-  const file = logoUpload.files[0]
+  loadDateButton.addEventListener('click', () => {
+    selectedAdminDate = adminDateFilter.value
+    loadAdminReservations()
+})
 
-  if (!file) {
-    brandingMessage.innerHTML = `
-      <p style="color:red">Please choose an image first.</p>
-    `
-    return
-  }
+showActiveButton.addEventListener('click', () => {
+  adminViewMode = 'active'
+  loadAdminReservations()
+})
 
-  const fileName = `logo-${Date.now()}-${file.name}`
+showArchivedButton.addEventListener('click', () => {
+  adminViewMode = 'archived'
+  loadAdminReservations()
+})
 
-  const { error: uploadError } = await supabase.storage
-    .from('restaurant-logos')
-    .upload(fileName, file)
-
-  if (uploadError) {
-    console.error(uploadError)
-    brandingMessage.innerHTML = `
-      <p style="color:red">Logo upload failed.</p>
-    `
-    return
-  }
-
-  const { data: publicUrlData } = supabase.storage
-    .from('restaurant-logos')
-    .getPublicUrl(fileName)
-
-  const logoUrl = publicUrlData.publicUrl
-
-  const { error: updateError } = await supabase
-    .from('restaurant_branding')
-    .update({ logo_url: logoUrl })
-    .eq('id', branding.id)
-
-  if (updateError) {
-    console.error(updateError)
-    brandingMessage.innerHTML = `
-      <p style="color:red">Logo uploaded but branding update failed.</p>
-    `
-    return
-  }
-
-  brandingMessage.innerHTML = `
-    <p style="color:green">Logo uploaded successfully. Refresh page to see it.</p>
-  `
-}
-
+showAllButton.addEventListener('click', () => {
+  adminViewMode = 'all'
+  loadAdminReservations()
+})
   loadAdminReservations()
 }
 }
 
 if (currentPage === '/admin/settings') {
   const branding = await loadBranding()
-
-  const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD
-  const enteredPassword = prompt('Enter admin password:')
-
-  if (enteredPassword !== adminPassword) {
+  const { data: settings } = await supabase
+    .from('restaurant_settings')
+    .select('*')
+    .eq('id', 1)
+    .single()
+if (!requireAdminPassword()) {
     document.querySelector('#app').innerHTML = `
       <h1>Access Denied</h1>
       <p>You are not authorized to view this page.</p>
@@ -651,6 +897,7 @@ if (currentPage === '/admin/settings') {
 
       <div class="admin-nav">
         <a href="/admin">Dashboard</a>
+        <a href="/admin/analytics">Analytics</a>
         <a href="/admin/settings">Settings</a>
       </div>
 
@@ -675,6 +922,46 @@ if (currentPage === '/admin/settings') {
         <button type="submit">Save Brand Settings</button>
       </form>
 
+      <form id="operationalSettingsForm">
+        <h2>Operational Settings</h2>
+
+        <label>Opening Time</label>
+        <input
+          type="time"
+          id="openingTime"
+          value="${settings.opening_time}"
+        />
+        <br /><br />
+
+        <label>Closing Time</label>
+        <input
+          type="time"
+          id="closingTime"
+          value="${settings.closing_time}"
+        />
+        <br /><br />
+
+        <label>Maximum Guests Per Slot</label>
+        <input
+          type="number"
+          id="maxGuestsPerSlot"
+          value="${settings.max_guests_per_slot}"
+        />
+        <br /><br />
+
+        <label>Default Reservation Duration (minutes)</label>
+        <input
+          type="number"
+          id="defaultDurationMinutes"
+          value="${settings.default_duration_minutes}"
+        />
+        <br /><br />
+
+        <button type="submit">
+          Save Operational Settings
+        </button>
+      </form>
+
       <form id="logoForm">
         <h2>Logo Upload</h2>
 
@@ -690,30 +977,56 @@ if (currentPage === '/admin/settings') {
     const brandingForm = document.getElementById('brandingForm')
     const logoForm = document.getElementById('logoForm')
     const brandingMessage = document.getElementById('brandingMessage')
+    const operationalSettingsForm = document.getElementById('operationalSettingsForm')
 
-    brandingForm.addEventListener('submit', async (e) => {
-      e.preventDefault()
+brandingForm.addEventListener('submit', async (e) => {
+  e.preventDefault()
 
-      const updatedBranding = {
-        restaurant_name: document.getElementById('restaurantName').value,
-        primary_color: document.getElementById('primaryColor').value,
-        background_start: document.getElementById('backgroundStart').value,
-        background_end: document.getElementById('backgroundEnd').value
-      }
+  const updatedBranding = {
+    restaurant_name: document.getElementById('restaurantName').value,
+    primary_color: document.getElementById('primaryColor').value,
+    background_start: document.getElementById('backgroundStart').value,
+    background_end: document.getElementById('backgroundEnd').value
+  }
 
-      const { error } = await supabase
-        .from('restaurant_branding')
-        .update(updatedBranding)
-        .eq('id', branding.id)
+  const { error } = await supabase
+    .from('restaurant_branding')
+    .update(updatedBranding)
+    .eq('id', branding.id)
 
-      if (error) {
-        console.error(error)
-        brandingMessage.innerHTML = '<p style="color:red">Could not save brand settings.</p>'
-        return
-      }
+  if (error) {
+    console.error(error)
+    brandingMessage.innerHTML = '<p style="color:red">Could not save brand settings.</p>'
+    return
+  }
 
-      brandingMessage.innerHTML = '<p style="color:green">Brand settings saved. Refresh page to see changes.</p>'
-    })
+  brandingMessage.innerHTML = '<p style="color:green">Brand settings saved. Refresh page to see changes.</p>'
+})
+
+operationalSettingsForm.addEventListener('submit', async (e) => {
+  e.preventDefault()
+
+  const updatedSettings = {
+    opening_time: document.getElementById('openingTime').value,
+    closing_time: document.getElementById('closingTime').value,
+    max_guests_per_slot: parseInt(document.getElementById('maxGuestsPerSlot').value),
+    default_duration_minutes: parseInt(document.getElementById('defaultDurationMinutes').value)
+  }
+
+  const { error } = await supabase
+    .from('restaurant_settings')
+    .update(updatedSettings)
+    .eq('id', 1)
+
+  if (error) {
+    console.error(error)
+    brandingMessage.innerHTML = '<p style="color:red">Could not save operational settings.</p>'
+    return
+  }
+
+  brandingMessage.innerHTML = '<p style="color:green">Operational settings saved.</p>'
+})
+
 
     logoForm.addEventListener('submit', async (e) => {
       e.preventDefault()
@@ -757,5 +1070,217 @@ if (currentPage === '/admin/settings') {
 
       brandingMessage.innerHTML = '<p style="color:green">Logo uploaded successfully. Refresh page to see it.</p>'
     })
+
+      }
+}
+
+  if (currentPage === '/admin/analytics') {
+
+  const branding = await loadBranding()
+
+  if (!requireAdminPassword()) {
+    document.querySelector('#app').innerHTML = `
+      <h1>Access Denied</h1>
+      <p>You are not authorized to view this page.</p>
+    `
+  } else {
+
+    document.querySelector('#app').innerHTML = `
+      ${branding.logo_url ? `<img src="${branding.logo_url}" class="brand-logo" />` : ''}
+
+      <h1>${branding.restaurant_name} Analytics</h1>
+
+      <div class="admin-nav">
+        <a href="/admin">Dashboard</a>
+        <a href="/admin/analytics">Analytics</a>
+        <a href="/admin/settings">Settings</a>
+      </div>
+
+      <label>Start Date</label>
+      <input type="date" id="analyticsStartDate" />
+
+      <br /><br />
+
+      <label>End Date</label>
+      <input type="date" id="analyticsEndDate" />
+
+      <br /><br />
+
+      <button id="loadAnalyticsButton">
+        Load Analytics
+      </button>
+
+      <hr>
+
+      <div id="analyticsResults">
+        Select a date range and click Load Analytics.
+      </div>
+    `
+
+    const analyticsStartDate = document.getElementById('analyticsStartDate')
+    const analyticsEndDate = document.getElementById('analyticsEndDate')
+    const loadAnalyticsButton = document.getElementById('loadAnalyticsButton')
+    const analyticsResults = document.getElementById('analyticsResults')
+
+    const today = new Date().toISOString().split('T')[0]
+
+analyticsStartDate.value = today
+analyticsEndDate.value = today
+
+async function loadAnalytics() {
+  const startDate = analyticsStartDate.value
+  const endDate = analyticsEndDate.value
+
+  const { data, error } = await supabase
+    .from('reservations')
+    .select('*')
+    .gte('reservation_date', startDate)
+    .lte('reservation_date', endDate)
+
+  if (error) {
+    console.error(error)
+    analyticsResults.innerHTML = `
+      <p style="color:red">Could not load analytics.</p>
+    `
+    return
   }
+
+  const totalReservations = data.length
+
+  const confirmed = data.filter(
+    reservation => reservation.status === 'confirmed'
+  )
+
+  const completed = data.filter(
+    reservation => reservation.status === 'completed'
+  )
+
+  const cancelled = data.filter(
+    reservation => reservation.status === 'cancelled'
+  )
+
+  const noShows = data.filter(
+    reservation => reservation.status === 'no_show'
+  )
+
+  const archived = data.filter(
+    reservation => reservation.is_archived
+  )
+
+  const totalGuests = data.reduce(
+    (total, reservation) => total + reservation.party_size,
+    0
+  )
+
+  const completionRate =
+    totalReservations > 0
+      ? Math.round((completed.length / totalReservations) * 100)
+      : 0
+
+  const cancellationRate =
+    totalReservations > 0
+      ? Math.round((cancelled.length / totalReservations) * 100)
+      : 0
+
+  const noShowRate =
+    totalReservations > 0
+      ? Math.round((noShows.length / totalReservations) * 100)
+      : 0
+
+  const averagePartySize =
+    totalReservations > 0
+      ? (totalGuests / totalReservations).toFixed(1)
+      : 0
+
+  const timeCounts = {}
+
+  data.forEach((reservation) => {
+    const time = reservation.reservation_time
+
+    if (!timeCounts[time]) {
+      timeCounts[time] = 0
+    }
+
+    timeCounts[time] += 1
+  })
+
+  let busiestTime = 'N/A'
+  let busiestTimeCount = 0
+
+  Object.entries(timeCounts).forEach(([time, count]) => {
+    if (count > busiestTimeCount) {
+      busiestTime = time
+      busiestTimeCount = count
+    }
+  })
+
+  analyticsResults.innerHTML = `
+    <div class="summary-grid">
+      <div class="summary-card">
+        <h3>Total Reservations</h3>
+        <p>${totalReservations}</p>
+      </div>
+
+      <div class="summary-card">
+        <h3>Total Guests</h3>
+        <p>${totalGuests}</p>
+      </div>
+
+      <div class="summary-card">
+        <h3>Confirmed</h3>
+        <p>${confirmed.length}</p>
+      </div>
+
+      <div class="summary-card">
+        <h3>Completed</h3>
+        <p>${completed.length}</p>
+      </div>
+
+      <div class="summary-card">
+        <h3>Cancelled</h3>
+        <p>${cancelled.length}</p>
+      </div>
+
+      <div class="summary-card">
+        <h3>No Shows</h3>
+        <p>${noShows.length}</p>
+      </div>
+
+      <div class="summary-card">
+        <h3>Archived</h3>
+        <p>${archived.length}</p>
+      </div>
+
+      <div class="summary-card">
+        <h3>Completion Rate</h3>
+        <p>${completionRate}%</p>
+      </div>
+
+      <div class="summary-card">
+        <h3>Cancellation Rate</h3>
+        <p>${cancellationRate}%</p>
+      </div>
+
+      <div class="summary-card">
+        <h3>No Show Rate</h3>
+        <p>${noShowRate}%</p>
+      </div>
+
+      <div class="summary-card">
+        <h3>Avg Party Size</h3>
+        <p>${averagePartySize}</p>
+      </div>
+
+      <div class="summary-card">
+        <h3>Busiest Time</h3>
+        <p>${busiestTime}</p>
+      </div>
+    </div>
+  `
+}
+
+loadAnalyticsButton.addEventListener('click', loadAnalytics)
+
+loadAnalytics()
+      }
 }
