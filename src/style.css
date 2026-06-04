@@ -80,6 +80,11 @@ button {
   font-weight: bold;
 }
 
+.settings-tabs button.active {
+  background: #333;
+  color: white;
+}
+
 .brand-logo {
   display: block;
   max-width: 140px;
