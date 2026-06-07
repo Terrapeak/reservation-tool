@@ -742,7 +742,7 @@ function updateDashboardSummary(reservations) {
 
       <div class="summary-card">
         <h3>${profile.capacity_label} Today</h3>
-        <p>${totalGuests}</p>
+        <p>${totalCapacityUnits}</p>
       </div>
 
       <div class="summary-card">
@@ -1917,10 +1917,10 @@ async function loadAnalytics() {
       ? Math.round((noShows.length / totalReservations) * 100)
       : 0
 
-  const averagePartySize =
-    totalReservations > 0
-      ? (totalGuests / totalReservations).toFixed(1)
-      : 0
+  const averageCapacityUnits =
+  totalReservations > 0
+    ? (totalCapacityUnits / totalReservations).toFixed(1)
+    : 0
 
   const timeCounts = {}
 
