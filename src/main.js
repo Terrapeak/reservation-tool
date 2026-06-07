@@ -650,7 +650,7 @@ if (pageRoute === '/admin') {
   placeholder="Search by reference number"
 />
 
-<<button id="searchButton">Search</button>
+<button id="searchButton">Search</button>
 
 <button id="refreshButton">
   Show All ${profile.booking_label}s
@@ -728,10 +728,10 @@ function updateDashboardSummary(reservations) {
     reservation => reservation.status === 'no_show'
   )
 
-  const totalGuests = confirmed.reduce(
-    (total, reservation) => total + reservation.party_size,
-    0
-  )
+  const totalCapacityUnits = confirmed.reduce(
+  (total, reservation) => total + reservation.party_size,
+  0
+)
 
   dashboardSummary.innerHTML = `
     <div class="summary-grid">
