@@ -2,6 +2,62 @@ import './style.css'
 import { supabase } from './supabaseclient.js'
 
 const currentPage = window.location.pathname
+
+const pathParts =
+  window.location.pathname
+    .split('/')
+    .filter(Boolean)
+
+let currentBusinessId = 1
+
+let currentBusinessSlug =
+  pathParts[0] || 'dim-sum-dragon'
+
+let pageRoute = '/'
+
+  if (pathParts.length === 0) {
+    currentBusinessSlug = 'dim-sum-dragon'
+    pageRoute = '/'
+}
+
+  if (pathParts.length === 1) {
+    currentBusinessSlug = pathParts[0]
+    pageRoute = '/'
+}
+
+  if (pathParts.length > 1) {
+    currentBusinessSlug = pathParts[0]
+    pageRoute = '/' + pathParts.slice(1).join('/')
+}
+
+console.log('PATH PARTS:', pathParts)
+console.log('BUSINESS SLUG:', currentBusinessSlug)
+console.log('PAGE ROUTE:', pageRoute)
+
+async function loadCurrentBusiness() {
+  console.log('CURRENT BUSINESS SLUG:', currentBusinessSlug)
+
+  const { data, error } = await supabase
+    .from('businesses')
+    .select('*')
+    .eq('business_slug', currentBusinessSlug)
+    .single()
+
+  if (error) {
+    console.error('Could not load business:', error)
+
+    return {
+      id: 1,
+      business_name: 'Dim Sum Dragon',
+      business_slug: 'dim-sum-dragon',
+      business_type: 'restaurant'
+    }
+  }
+
+  currentBusinessId = data.id
+  return data
+}
+
 function isAdminLoggedIn() {
   const loginExpiry = localStorage.getItem('adminLoginExpiry')
 
@@ -40,7 +96,7 @@ async function loadBranding() {
   const { data, error } = await supabase
     .from('restaurant_branding')
     .select('*')
-    .limit(1)
+    .eq('business_id', currentBusinessId)
     .single()
 
   if (error) {
@@ -66,7 +122,7 @@ async function loadRestaurantSettings() {
   const { data, error } = await supabase
     .from('restaurant_settings')
     .select('*')
-    .eq('id', 1)
+    .eq('business_id', currentBusinessId)
     .single()
 
   if (error) {
@@ -87,7 +143,7 @@ async function loadBusinessProfile() {
   const { data, error } = await supabase
     .from('business_profile')
     .select('*')
-    .eq('id', 1)
+    .eq('business_id', currentBusinessId)
     .single()
 
   if (error) {
@@ -109,6 +165,7 @@ async function loadCustomFields() {
   const { data, error } = await supabase
     .from('booking_custom_fields')
     .select('*')
+    .eq('business_id', currentBusinessId)
     .eq('is_active', true)
     .order('display_order', { ascending: true })
 
@@ -120,7 +177,9 @@ async function loadCustomFields() {
   return data
 }
 
-if (currentPage === '/') {
+const currentBusiness = await loadCurrentBusiness()
+
+if (pageRoute === '/') {
   const profile = await loadBusinessProfile()
   const branding = await loadBranding()
   const customFields = await loadCustomFields()
@@ -130,30 +189,99 @@ if (currentPage === '/') {
   <h1>${profile.business_name} ${profile.booking_label}s</h1>
 
   <form id="reservationForm">
-    <input type="text" id="name" placeholder="${profile.customer_label} Name" required />
+    <input type="text" 
+    id="name" 
+    placeholder="${profile.customer_label} 
+    Name" required />
     <br /><br />
 
-    <input type="text" id="phone" placeholder="Phone Number" required />
+    <input type="text" 
+    id="phone" 
+    placeholder="Phone Number" 
+    required />
     <br /><br />
 
-    <input type="date" id="date" required />
+    <input type="date" 
+    id="date" 
+    required />
     <br /><br />
 
-    <input type="time" id="time" required />
+    <input type="time" 
+    id="time" 
+    required />
     <br /><br />
 
-    <input type="number" id="guests" placeholder="Number of ${profile.capacity_label}" required />
-    <br /><br />
+    ${
+  profile.uses_capacity
+    ? `
+      <input
+        type="number"
+        id="guests"
+        placeholder="Number of ${profile.capacity_label}"
+        required
+      />
+      <br /><br />
+    `
+    : ''
+}
     
-    ${customFields.map((field) => `
-  <input
-    type="${field.field_type}"
-    id="custom-${field.id}"
-    placeholder="${field.field_label}"
-    ${field.is_required ? 'required' : ''}
-  />
-  <br /><br />
-`).join('')}
+    ${customFields.map((field) => {
+  if (field.field_type === 'textarea') {
+    return `
+      <textarea
+        id="custom-${field.id}"
+        placeholder="${field.field_label}"
+        ${field.is_required ? 'required' : ''}
+      ></textarea>
+      <br /><br />
+    `
+  }
+
+  if (field.field_type === 'checkbox') {
+    return `
+      <label>
+        <input
+          type="checkbox"
+          id="custom-${field.id}"
+        />
+        ${field.field_label}
+      </label>
+      <br /><br />
+    `
+  }
+
+  if (field.field_type === 'dropdown') {
+    const options = (field.field_options || '')
+      .split('\n')
+      .filter(option => option.trim() !== '')
+
+    return `
+      <label>${field.field_label}</label>
+      <select
+        id="custom-${field.id}"
+        ${field.is_required ? 'required' : ''}
+      >
+        <option value="">Select an option</option>
+        ${options.map(option => `
+          <option value="${option}">
+            ${option}
+          </option>
+        `).join('')}
+      </select>
+      <br /><br />
+    `
+  }
+
+  return `
+    <input
+      type="${field.field_type}"
+      id="custom-${field.id}"
+      placeholder="${field.field_label}"
+      ${field.is_required ? 'required' : ''}
+    />
+    <br /><br />
+  `
+}).join('')}
 
     <textarea id="request" placeholder="Special Requests"></textarea>
     <br /><br />
@@ -166,13 +294,21 @@ if (currentPage === '/') {
   <div id="message"></div>
 <hr>
 
-<h2>Cancel Reservation</h2>
+<h2>Cancel ${profile.booking_label}</h2>
 
 <form id="cancelForm">
-  <input type="text" id="cancelReference" placeholder="Reservation Reference" required />
+  <input
+    type="text"
+    id="cancelReference"
+    placeholder="${profile.booking_label} Reference"
+    required
+  />
+
   <br /><br />
 
-  <button type="submit">Cancel Reservation</button>
+  <button type="submit">
+    Cancel ${profile.booking_label}
+  </button>
 </form>
 
 <div id="cancelMessage"></div>
@@ -192,6 +328,7 @@ async function checkAvailability(
   const { data, error } = await supabase
     .from('reservations')
     .select('*')
+    .eq('business_id', currentBusinessId)
     .eq('reservation_date', reservation_date)
     .eq('reservation_time', reservation_time)
     .eq('status', 'confirmed')
@@ -276,6 +413,7 @@ async function generateReservationReference(reservation_date) {
   const { data, error } = await supabase
     .from('reservations')
     .select('id')
+    .eq('business_id', currentBusinessId)
     .eq('reservation_date', reservation_date)
 
   if (error) {
@@ -308,7 +446,10 @@ submitButton.textContent = 'Creating Reservation...'
   const phone = document.getElementById('phone').value
   const reservation_date = document.getElementById('date').value
   const reservation_time = document.getElementById('time').value
-  const party_size = parseInt(document.getElementById('guests').value)
+  const party_size =
+    profile.uses_capacity
+      ? parseInt(document.getElementById('guests').value)
+      : 1
   const special_request = document.getElementById('request').value
   const reservation_reference =
   await generateReservationReference(reservation_date)
@@ -372,14 +513,21 @@ if (!available) {
 const custom_data = {}
 
 customFields.forEach((field) => {
-  custom_data[field.field_label] =
-    document.getElementById(`custom-${field.id}`).value
+  const customInput = document.getElementById(`custom-${field.id}`)
+
+custom_data[field.field_label] =
+  field.field_type === 'checkbox'
+    ? customInput.checked
+      ? 'Yes'
+      : 'No'
+    : customInput.value
 })
 
   const { error } = await supabase
     .from('reservations')
     .insert([
       {
+        business_id: currentBusinessId,
         customer_name,
         phone,
         reservation_date,
@@ -427,6 +575,7 @@ cancelForm.addEventListener('submit', async (e) => {
   const { data, error } = await supabase
     .from('reservations')
     .update({ status: 'cancelled' })
+    .eq('business_id', currentBusinessId)
     .eq('reservation_reference', reservation_reference)
     .eq('status', 'confirmed')
     .select()
@@ -450,7 +599,7 @@ cancelForm.addEventListener('submit', async (e) => {
   if (data.length === 0) {
     cancelMessage.innerHTML = `
       <p style="color:red">
-        No active reservation found with that reference number.
+        No active ${profile.booking_label.toLowerCase()} found with that reference number.
       </p>
     `
 
@@ -461,9 +610,10 @@ cancelForm.addEventListener('submit', async (e) => {
   }
 
   cancelMessage.innerHTML = `
-    <p style="color:green">
-      Reservation ${reservation_reference} has been cancelled.
-    </p>
+  <p style="color:green">
+    ${profile.booking_label} ${reservation_reference} has been cancelled.
+  </p>
+
   `
 
   cancelForm.reset()
@@ -474,7 +624,7 @@ cancelForm.addEventListener('submit', async (e) => {
 
 }
 
-if (currentPage === '/admin') {
+if (pageRoute === '/admin') {
   const branding = await loadBranding()
   const profile = await loadBusinessProfile()
 
@@ -489,9 +639,9 @@ if (currentPage === '/admin') {
   <h1>${profile.business_name} Admin Dashboard</h1>
 
   <div class="admin-nav">
-  <a href="/admin">Dashboard</a>
-  <a href="/admin/analytics">Analytics</a>
-  <a href="/admin/settings">Settings</a>
+  <a href="/${currentBusinessSlug}/admin">Dashboard</a>
+  <a href="/${currentBusinessSlug}/admin/analytics">Analytics</a>
+  <a href="/${currentBusinessSlug}/admin/settings">Settings</a>
 </div>
 
     <input 
@@ -500,8 +650,11 @@ if (currentPage === '/admin') {
   placeholder="Search by reference number"
 />
 
-<button id="searchButton">Search</button>
-<button id="refreshButton">Show All Reservations</button>
+<<button id="searchButton">Search</button>
+
+<button id="refreshButton">
+  Show All ${profile.booking_label}s
+</button>
 <br /><br />
 
 <label>Select Date</label>
@@ -696,6 +849,7 @@ async function loadAdminReservations() {
   let query = supabase
   .from('reservations')
   .select('*')
+  .eq('business_id', currentBusinessId)
   .eq('reservation_date', selectedAdminDate)
   .order('reservation_time', { ascending: true })
 
@@ -811,9 +965,10 @@ async function searchReservationByReference() {
   }
 
   const { data, error } = await supabase
-    .from('reservations')
-    .select('*')
-    .eq('reservation_reference', reference)
+  .from('reservations')
+  .select('*')
+  .eq('business_id', currentBusinessId)
+  .eq('reservation_reference', reference)
 
   if (error) {
     console.error(error)
@@ -957,14 +1112,15 @@ function renderCustomData(customData) {
 }
 }
 
-if (currentPage === '/admin/settings') {
+
+if (pageRoute === '/admin/settings') {
   const branding = await loadBranding()
   const profile = await loadBusinessProfile()
 
   const { data: settings } = await supabase
     .from('restaurant_settings')
     .select('*')
-    .eq('id', 1)
+    .eq('business_id', currentBusinessId)
     .single()
 if (!requireAdminPassword()) {
     document.querySelector('#app').innerHTML = `
@@ -977,9 +1133,9 @@ if (!requireAdminPassword()) {
       <h1>${branding.restaurant_name} Settings</h1>
 
       <div class="admin-nav">
-        <a href="/admin">Dashboard</a>
-        <a href="/admin/analytics">Analytics</a>
-        <a href="/admin/settings">Settings</a>
+        <a href="/${currentBusinessSlug}/admin">Dashboard</a>
+        <a href="/${currentBusinessSlug}/admin/analytics">Analytics</a>
+        <a href="/${currentBusinessSlug}/admin/settings">Settings</a>
       </div>
       
       <div class="settings-tabs">
@@ -1037,6 +1193,16 @@ if (!requireAdminPassword()) {
         <input type="text" id="capacityLabel" value="${profile.capacity_label}" placeholder="Guests, Clients, Patients" />
         <br /><br />
 
+        <label>
+        <input type="checkbox"
+         id="usesCapacity"
+         ${profile.uses_capacity ? 'checked' : ''}
+        />
+        Allow Group Bookings
+        </label>
+
+        <br /><br />
+
         <button type="submit">Save Business Profile</button>
 
         <button
@@ -1056,12 +1222,27 @@ if (!requireAdminPassword()) {
 
   <label>Field Type</label>
   <select id="customFieldType">
-    <option value="text">Text</option>
-    <option value="number">Number</option>
-    <option value="date">Date</option>
-    <option value="time">Time</option>
-  </select>
+  <option value="text">Text</option>
+  <option value="number">Number</option>
+  <option value="date">Date</option>
+  <option value="time">Time</option>
+  <option value="textarea">Long Text</option>
+  <option value="checkbox">Checkbox</option>
+  <option value="dropdown">Dropdown</option>
+</select>
   <br /><br />
+
+  <textarea
+  id="customFieldOptions"
+  placeholder="Dropdown options, one per line. Example:&#10;1 - Lowest&#10;2&#10;3&#10;10 - Highest"
+></textarea>
+<br /><br />
+
+<button type="button" id="scaleOptionsButton">
+  Use 1-10 Scale
+</button>
+
+<br /><br />
 
   <label>
     <input type="checkbox" id="customFieldRequired" />
@@ -1161,6 +1342,7 @@ if (!requireAdminPassword()) {
     const brandingMessage = document.getElementById('brandingMessage')
     const operationalSettingsForm = document.getElementById('operationalSettingsForm')
     const customFieldForm = document.getElementById('customFieldForm')
+    const scaleOptionsButton = document.getElementById('scaleOptionsButton')
     const customFieldsList = document.getElementById('customFieldsList')
     const applyTemplateButton = document.getElementById('applyTemplateButton')
     const businessTabButton = document.getElementById('businessTabButton')
@@ -1197,6 +1379,7 @@ if (!requireAdminPassword()) {
       await supabase
         .from('booking_custom_fields')
         .update({ is_active: false })
+        .eq('business_id', currentBusinessId)
         .eq('is_active', true)
 
       const fields = templates[template] || []
@@ -1206,6 +1389,7 @@ if (!requireAdminPassword()) {
           .from('booking_custom_fields')
            .insert([
             {
+              business_id: currentBusinessId,
               field_label: fields[i],
               field_type: 'text',
               is_required: false,
@@ -1262,14 +1446,23 @@ if (!requireAdminPassword()) {
       Type: ${field.field_type}<br>
       Required: ${field.is_required ? 'Yes' : 'No'}<br><br>
 
-      <button 
+  <button 
   class="edit-field-button" 
   data-id="${field.id}"
   data-label="${field.field_label}"
   data-type="${field.field_type}"
   data-required="${field.is_required}"
+  data-options="${field.field_options || ''}"
 >
   Edit Field
+</button>
+
+<button class="move-field-up-button" data-id="${field.id}">
+  ↑ Up
+</button>
+
+<button class="move-field-down-button" data-id="${field.id}">
+  ↓ Down
 </button>
 
 <button class="delete-field-button" data-id="${field.id}">
@@ -1288,13 +1481,14 @@ if (!requireAdminPassword()) {
       industry_template: document.getElementById('industryTemplate').value,
       booking_label: document.getElementById('bookingLabel').value,
       customer_label: document.getElementById('customerLabel').value,
-      capacity_label: document.getElementById('capacityLabel').value
+      capacity_label: document.getElementById('capacityLabel').value,
+      uses_capacity: document.getElementById('usesCapacity').checked
   }
 
   const { error } = await supabase
     .from('business_profile')
     .update(updatedProfile)
-    .eq('id', 1)
+    .eq('business_id', currentBusinessId)
 
   if (error) {
     console.error(error)
@@ -1342,7 +1536,7 @@ operationalSettingsForm.addEventListener('submit', async (e) => {
   const { error } = await supabase
     .from('restaurant_settings')
     .update(updatedSettings)
-    .eq('id', 1)
+    .eq('business_id', currentBusinessId)
 
   if (error) {
     console.error(error)
@@ -1353,11 +1547,26 @@ operationalSettingsForm.addEventListener('submit', async (e) => {
   brandingMessage.innerHTML = '<p style="color:green">Operational settings saved.</p>'
 })
 
+  scaleOptionsButton.addEventListener('click', () => {
+  document.getElementById('customFieldOptions').value =
+    `1 - Lowest
+2
+3
+4
+5
+6
+7
+8
+9
+10 - Highest`
+})
+
 customFieldForm.addEventListener('submit', async (e) => {
   e.preventDefault()
 
   const field_label = document.getElementById('customFieldLabel').value.trim()
   const field_type = document.getElementById('customFieldType').value
+  const field_options = document.getElementById('customFieldOptions').value.trim()
   const is_required = document.getElementById('customFieldRequired').checked
 
   if (!field_label) {
@@ -1371,6 +1580,7 @@ customFieldForm.addEventListener('submit', async (e) => {
     .update({
       field_label,
       field_type,
+      field_options,
       is_required
     })
     .eq('id', editingCustomFieldId)
@@ -1402,8 +1612,10 @@ customFieldForm.addEventListener('submit', async (e) => {
     .from('booking_custom_fields')
     .insert([
       {
+        business_id: currentBusinessId,
         field_label,
         field_type,
+        field_options,
         is_required,
         display_order,
         is_active: true
@@ -1421,7 +1633,55 @@ customFieldForm.addEventListener('submit', async (e) => {
   loadCustomFieldsList()
 })
 
+async function moveCustomField(fieldId, direction) {
+  const fields = await loadCustomFields()
+
+  const currentIndex = fields.findIndex(
+    field => String(field.id) === String(fieldId)
+  )
+
+  if (currentIndex === -1) {
+    return
+  }
+
+  const swapIndex =
+    direction === 'up'
+      ? currentIndex - 1
+      : currentIndex + 1
+
+  if (swapIndex < 0 || swapIndex >= fields.length) {
+    return
+  }
+
+  const currentField = fields[currentIndex]
+  const swapField = fields[swapIndex]
+
+  await supabase
+    .from('booking_custom_fields')
+    .update({ display_order: swapField.display_order })
+    .eq('id', currentField.id)
+
+  await supabase
+    .from('booking_custom_fields')
+    .update({ display_order: currentField.display_order })
+    .eq('id', swapField.id)
+
+  loadCustomFieldsList()
+}
+
 customFieldsList.addEventListener('click', async (e) => {
+  if (e.target.classList.contains('move-field-up-button')) {
+  const fieldId = e.target.dataset.id
+  await moveCustomField(fieldId, 'up')
+  return
+}
+
+if (e.target.classList.contains('move-field-down-button')) {
+  const fieldId = e.target.dataset.id
+  await moveCustomField(fieldId, 'down')
+  return
+}
+
   if (e.target.classList.contains('edit-field-button')) {
   editingCustomFieldId = e.target.dataset.id
 
@@ -1542,9 +1802,10 @@ customFieldsList.addEventListener('click', async (e) => {
   }
 }
 
-  if (currentPage === '/admin/analytics') {
+  if (pageRoute === '/admin/analytics') {
 
   const branding = await loadBranding()
+  const profile = await loadBusinessProfile()
 
   if (!requireAdminPassword()) {
     document.querySelector('#app').innerHTML = `
@@ -1556,12 +1817,12 @@ customFieldsList.addEventListener('click', async (e) => {
     document.querySelector('#app').innerHTML = `
       ${branding.logo_url ? `<img src="${branding.logo_url}" class="brand-logo" />` : ''}
 
-      <h1>${branding.restaurant_name} Analytics</h1>
+      <h1>${profile.business_name} Analytics</h1>
 
       <div class="admin-nav">
-        <a href="/admin">Dashboard</a>
-        <a href="/admin/analytics">Analytics</a>
-        <a href="/admin/settings">Settings</a>
+        <a href="/${currentBusinessSlug}/admin">Dashboard</a>
+        <a href="/${currentBusinessSlug}/admin/analytics">Analytics</a>
+        <a href="/${currentBusinessSlug}/admin/settings">Settings</a>
       </div>
 
       <label>Start Date</label>
@@ -1600,10 +1861,11 @@ async function loadAnalytics() {
   const endDate = analyticsEndDate.value
 
   const { data, error } = await supabase
-    .from('reservations')
-    .select('*')
-    .gte('reservation_date', startDate)
-    .lte('reservation_date', endDate)
+  .from('reservations')
+  .select('*')
+  .eq('business_id', currentBusinessId)
+  .gte('reservation_date', startDate)
+  .lte('reservation_date', endDate)
 
   if (error) {
     console.error(error)
@@ -1635,10 +1897,10 @@ async function loadAnalytics() {
     reservation => reservation.is_archived
   )
 
-  const totalGuests = data.reduce(
-    (total, reservation) => total + reservation.party_size,
-    0
-  )
+  const totalCapacityUnits = data.reduce(
+  (total, reservation) => total + reservation.party_size,
+  0
+)
 
   const completionRate =
     totalReservations > 0
@@ -1685,14 +1947,20 @@ async function loadAnalytics() {
   analyticsResults.innerHTML = `
     <div class="summary-grid">
       <div class="summary-card">
-        <h3>Total Reservations</h3>
+        <h3>Total ${profile.booking_label}s</h3>
         <p>${totalReservations}</p>
       </div>
 
+      ${
+  profile.uses_capacity
+    ? `
       <div class="summary-card">
-        <h3>Total Guests</h3>
-        <p>${totalGuests}</p>
+        <h3>Total ${profile.capacity_label}</h3>
+        <p>${totalCapacityUnits}</p>
       </div>
+    `
+    : ''
+}
 
       <div class="summary-card">
         <h3>Confirmed</h3>
@@ -1734,15 +2002,6 @@ async function loadAnalytics() {
         <p>${noShowRate}%</p>
       </div>
 
-      <div class="summary-card">
-        <h3>Avg Party Size</h3>
-        <p>${averagePartySize}</p>
-      </div>
-
-      <div class="summary-card">
-        <h3>Busiest Time</h3>
-        <p>${busiestTime}</p>
-      </div>
     </div>
   `
 }
