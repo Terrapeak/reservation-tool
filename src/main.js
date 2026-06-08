@@ -161,6 +161,20 @@ async function loadBusinessProfile() {
   return data
 }
 
+async function loadBusinesses() {
+  const { data, error } = await supabase
+    .from('businesses')
+    .select('*')
+    .order('business_name')
+
+  if (error) {
+    console.error(error)
+    return []
+  }
+
+  return data
+}
+
 async function loadCustomFields() {
   const { data, error } = await supabase
     .from('booking_custom_fields')
@@ -287,9 +301,13 @@ if (pageRoute === '/') {
     <br /><br />
 
     <button type="submit">Create ${profile.booking_label}</button>
-  </form>
+  
+    <p style="font-size:12px; color:#666; margin-top:10px;">
+    By submitting this form, you agree that your details will be stored for booking management purposes.
+    </p>
+    </form>
 
-  <hr>
+<hr>
 
   <div id="message"></div>
 <hr>
@@ -407,7 +425,7 @@ async function findAvailableSlots(reservation_date, requested_time, party_size) 
   return availableSlots
 }
 
-async function generateReservationReference(reservation_date) {
+async function generateReservationReference(reservation_date, profile) {
   const dateCode = reservation_date.replaceAll('-', '')
 
   const { data, error } = await supabase
@@ -418,13 +436,16 @@ async function generateReservationReference(reservation_date) {
 
   if (error) {
     console.error(error)
-    return `DSD-${dateCode}-001`
+  const prefix = profile.reference_prefix || 'REF'
+    return `${prefix}-${dateCode}-001`
   }
 
   const nextNumber = data.length + 1
   const paddedNumber = String(nextNumber).padStart(3, '0')
 
-  return `DSD-${dateCode}-${paddedNumber}`
+  const prefix = profile.reference_prefix || 'REF'
+
+  return `${prefix}-${dateCode}-${paddedNumber}` 
 }
 
 async function isWithinOpeningHours(reservation_time) {
@@ -452,7 +473,7 @@ submitButton.textContent = 'Creating Reservation...'
       : 1
   const special_request = document.getElementById('request').value
   const reservation_reference =
-  await generateReservationReference(reservation_date)
+  await generateReservationReference(reservation_date, profile)
 
 if (!(await isWithinOpeningHours(reservation_time))) {
   const message = document.getElementById('message')
@@ -627,6 +648,7 @@ cancelForm.addEventListener('submit', async (e) => {
 if (pageRoute === '/admin') {
   const branding = await loadBranding()
   const profile = await loadBusinessProfile()
+  const businesses = await loadBusinesses()
 
   if (!requireAdminPassword()) {
   document.querySelector('#app').innerHTML = `
@@ -637,6 +659,19 @@ if (pageRoute === '/admin') {
   document.querySelector('#app').innerHTML = `
   ${branding.logo_url ? `<img src="${branding.logo_url}" class="brand-logo" />` : ''}
   <h1>${profile.business_name} Admin Dashboard</h1>
+
+<select id="businessSwitcher">
+  ${businesses.map(business => `
+    <option
+      value="${business.business_slug}"
+      ${business.business_slug === currentBusinessSlug
+        ? 'selected'
+        : ''}
+    >
+      ${business.business_name}
+    </option>
+  `).join('')}
+</select>
 
   <div class="admin-nav">
   <a href="/${currentBusinessSlug}/admin">Dashboard</a>
@@ -657,9 +692,13 @@ if (pageRoute === '/admin') {
 </button>
 <br /><br />
 
-<label>Select Date</label>
-<input type="date" id="adminDateFilter" />
-<button id="loadDateButton">Load Date</button>
+<label>Start Date</label>
+<input type="date" id="adminStartDateFilter" />
+
+<label>End Date</label>
+<input type="date" id="adminEndDateFilter" />
+
+<button id="loadDateButton">Load Date Range</button>
 <br /><br />
 
 <label>View</label>
@@ -681,14 +720,19 @@ const searchButton = document.getElementById('searchButton')
 const searchReference = document.getElementById('searchReference')
 const adminReservations = document.getElementById('adminReservations')
 const dashboardSummary = document.getElementById('dashboardSummary')
-const adminDateFilter = document.getElementById('adminDateFilter')
+const adminStartDateFilter = document.getElementById('adminStartDateFilter')
+const adminEndDateFilter = document.getElementById('adminEndDateFilter')
 const loadDateButton = document.getElementById('loadDateButton')
 const showActiveButton = document.getElementById('showActiveButton')
 const showArchivedButton = document.getElementById('showArchivedButton')
 const showAllButton = document.getElementById('showAllButton')
+const businessSwitcher = document.getElementById('businessSwitcher')
 
-let selectedAdminDate = new Date().toISOString().split('T')[0]
-adminDateFilter.value = selectedAdminDate
+let selectedAdminStartDate = new Date().toISOString().split('T')[0]
+let selectedAdminEndDate = selectedAdminStartDate
+
+adminStartDateFilter.value = selectedAdminStartDate
+adminEndDateFilter.value = selectedAdminEndDate
 
 let adminViewMode = 'active'
 
@@ -708,9 +752,7 @@ async function markReservationCompleted(reservationId) {
 }
 
 function updateDashboardSummary(reservations) {
-  const selectedReservations = reservations.filter(
-    reservation => reservation.reservation_date === selectedAdminDate
-  )
+  const selectedReservations = reservations
 
   const confirmed = selectedReservations.filter(
     reservation => reservation.status === 'confirmed'
@@ -741,7 +783,7 @@ function updateDashboardSummary(reservations) {
       </div>
 
       <div class="summary-card">
-        <h3>${profile.capacity_label} Today</h3>
+        <h3>${profile.capacity_label}</h3>
         <p>${totalCapacityUnits}</p>
       </div>
 
@@ -850,7 +892,8 @@ async function loadAdminReservations() {
   .from('reservations')
   .select('*')
   .eq('business_id', currentBusinessId)
-  .eq('reservation_date', selectedAdminDate)
+  .gte('reservation_date', selectedAdminStartDate)
+  .lte('reservation_date', selectedAdminEndDate)
   .order('reservation_time', { ascending: true })
 
 if (adminViewMode === 'active') {
@@ -1079,8 +1122,10 @@ if (e.target.classList.contains('delete-button')) {
   searchButton.addEventListener('click', searchReservationByReference)
 
   loadDateButton.addEventListener('click', () => {
-    selectedAdminDate = adminDateFilter.value
-    loadAdminReservations()
+  selectedAdminStartDate = adminStartDateFilter.value
+  selectedAdminEndDate = adminEndDateFilter.value
+
+  loadAdminReservations()
 })
 
 showActiveButton.addEventListener('click', () => {
@@ -1097,6 +1142,15 @@ showAllButton.addEventListener('click', () => {
   adminViewMode = 'all'
   loadAdminReservations()
 })
+
+if (businessSwitcher) {
+  businessSwitcher.addEventListener('change', () => {
+    const selectedSlug = businessSwitcher.value
+
+    window.location.href =
+      `/${selectedSlug}/admin`
+  })
+}
 
 function renderCustomData(customData) {
   if (!customData) {
@@ -1116,6 +1170,7 @@ function renderCustomData(customData) {
 if (pageRoute === '/admin/settings') {
   const branding = await loadBranding()
   const profile = await loadBusinessProfile()
+  const businesses = await loadBusinesses()
 
   const { data: settings } = await supabase
     .from('restaurant_settings')
@@ -1131,6 +1186,21 @@ if (!requireAdminPassword()) {
     document.querySelector('#app').innerHTML = `
       ${branding.logo_url ? `<img src="${branding.logo_url}" class="brand-logo" />` : ''}
       <h1>${branding.restaurant_name} Settings</h1>
+
+<select id="businessSwitcher">
+  ${businesses.map(business => `
+    <option
+      value="${business.business_slug}"
+      ${business.business_slug === currentBusinessSlug
+        ? 'selected'
+        : ''}
+    >
+      ${business.business_name}
+    </option>
+  `).join('')}
+</select>
+
+<br /><br />
 
       <div class="admin-nav">
         <a href="/${currentBusinessSlug}/admin">Dashboard</a>
@@ -1148,14 +1218,33 @@ if (!requireAdminPassword()) {
       <form id="businessProfileForm">
         <h2>Business Profile</h2>
 
-        <input type="text" id="businessName" value="${profile.business_name}" placeholder="Business Name" />
-        <br /><br />
+      <input type="text" 
+        id="businessName" 
+        value="${profile.business_name}" 
+        placeholder="Business Name" 
+      />
+      <br /><br />
 
-        <label>Business Type</label>
-        <input type="text" id="businessType" value="${profile.business_type}" placeholder="restaurant, salon, physiotherapy" />
-        <br /><br />
+      <label>Reference Prefix</label>
+        <input
+        type="text"
+        id="referencePrefix"
+        value="${profile.reference_prefix || ''}"
+        placeholder="DSD, MBP, SALON, SPA"
+        maxlength="6"
+        style="text-transform:uppercase;" 
+      />
+      <br /><br />
 
-        <label>Industry Template</label>
+      <label>Business Type</label>
+        <input type="text" 
+        id="businessType" 
+        value="${profile.business_type}" 
+        placeholder="restaurant, salon, physiotherapy" 
+      />
+      <br /><br />
+
+      <label>Industry Template</label>
 
         <select id="industryTemplate">
           <option value="restaurant"
@@ -1182,15 +1271,24 @@ if (!requireAdminPassword()) {
         <br /><br />
 
         <label>Booking Label</label>
-        <input type="text" id="bookingLabel" value="${profile.booking_label}" placeholder="Reservation, Booking, Appointment" />
+        <input type="text" 
+        id="bookingLabel" 
+        value="${profile.booking_label}" 
+        placeholder="Reservation, Booking, Appointment" />
         <br /><br />
 
         <label>Customer Label</label>
-        <input type="text" id="customerLabel" value="${profile.customer_label}" placeholder="Customer, Client, Patient" />
+        <input type="text" 
+        id="customerLabel" 
+        value="${profile.customer_label}" 
+        placeholder="Customer, Client, Patient" />
         <br /><br />
 
         <label>Capacity Label</label>
-        <input type="text" id="capacityLabel" value="${profile.capacity_label}" placeholder="Guests, Clients, Patients" />
+        <input type="text" 
+        id="capacityLabel" 
+        value="${profile.capacity_label}" 
+        placeholder="Guests, Clients, Patients" />
         <br /><br />
 
         <label>
@@ -1217,7 +1315,9 @@ if (!requireAdminPassword()) {
       <form id="customFieldForm">
   <h2>Custom Booking Fields</h2>
 
-  <input type="text" id="customFieldLabel" placeholder="Field Label" />
+  <input type="text" 
+  id="customFieldLabel" 
+  placeholder="Field Label" />
   <br /><br />
 
   <label>Field Type</label>
@@ -1302,19 +1402,28 @@ if (!requireAdminPassword()) {
       <form id="brandingForm">
         <h2>Brand Settings</h2>
 
-        <input type="text" id="restaurantName" value="${branding.restaurant_name}" placeholder="Restaurant Name" />
+        <input type="text" 
+        id="restaurantName" 
+        value="${branding.restaurant_name}" 
+        placeholder="Restaurant Name" />
         <br /><br />
 
         <label>Primary Color</label>
-        <input type="color" id="primaryColor" value="${branding.primary_color}" />
+        <input type="color" 
+        id="primaryColor" 
+        value="${branding.primary_color}" />
         <br /><br />
 
         <label>Background Start</label>
-        <input type="color" id="backgroundStart" value="${branding.background_start}" />
+        <input type="color" 
+        id="backgroundStart" 
+        value="${branding.background_start}" />
         <br /><br />
 
         <label>Background End</label>
-        <input type="color" id="backgroundEnd" value="${branding.background_end}" />
+        <input type="color" 
+        id="backgroundEnd" 
+        value="${branding.background_end}" />
         <br /><br />
 
         <button type="submit">Save Brand Settings</button>
@@ -1348,7 +1457,7 @@ if (!requireAdminPassword()) {
     const businessTabButton = document.getElementById('businessTabButton')
     const operationsTabButton = document.getElementById('operationsTabButton')
     const brandingTabButton = document.getElementById('brandingTabButton')
-
+    const businessSwitcher = document.getElementById('businessSwitcher')
     const businessSettingsSection = document.getElementById('businessSettingsSection')
     const operationsSettingsSection = document.getElementById('operationsSettingsSection')
     const brandingSettingsSection = document.getElementById('brandingSettingsSection')
@@ -1477,6 +1586,7 @@ if (!requireAdminPassword()) {
 
     const updatedProfile = {
       business_name: document.getElementById('businessName').value,
+      reference_prefix: document.getElementById('referencePrefix').value,      
       business_type: document.getElementById('businessType').value,
       industry_template: document.getElementById('industryTemplate').value,
       booking_label: document.getElementById('bookingLabel').value,
@@ -1795,16 +1905,28 @@ if (e.target.classList.contains('move-field-down-button')) {
   await applyIndustryTemplate(template)
 })
 
+if (businessSwitcher) {
+  businessSwitcher.addEventListener('change', () => {
+    const selectedSlug = businessSwitcher.value
+
+    window.location.href =
+      `/${selectedSlug}/admin/settings`
+  })
+}
+
   showSettingsTab('business')
 
-    loadCustomFieldsList()
+  loadCustomFieldsList()
 
   }
 }
 
+
+
   if (pageRoute === '/admin/analytics') {
 
   const branding = await loadBranding()
+  const businesses = await loadBusinesses()
   const profile = await loadBusinessProfile()
 
   if (!requireAdminPassword()) {
@@ -1818,6 +1940,21 @@ if (e.target.classList.contains('move-field-down-button')) {
       ${branding.logo_url ? `<img src="${branding.logo_url}" class="brand-logo" />` : ''}
 
       <h1>${profile.business_name} Analytics</h1>
+
+    <select id="businessSwitcher">
+      ${businesses.map(business => `
+    <option
+      value="${business.business_slug}"
+      ${business.business_slug === currentBusinessSlug
+        ? 'selected'
+        : ''}
+    >
+      ${business.business_name}
+    </option>
+  `).join('')}
+    </select>
+
+      <br /><br />
 
       <div class="admin-nav">
         <a href="/${currentBusinessSlug}/admin">Dashboard</a>
@@ -1850,6 +1987,7 @@ if (e.target.classList.contains('move-field-down-button')) {
     const analyticsEndDate = document.getElementById('analyticsEndDate')
     const loadAnalyticsButton = document.getElementById('loadAnalyticsButton')
     const analyticsResults = document.getElementById('analyticsResults')
+    const businessSwitcher = document.getElementById('businessSwitcher')
 
     const today = new Date().toISOString().split('T')[0]
 
@@ -2004,6 +2142,15 @@ async function loadAnalytics() {
 
     </div>
   `
+}
+
+  if (businessSwitcher) {
+    businessSwitcher.addEventListener('change', () => {
+    const selectedSlug = businessSwitcher.value
+
+    window.location.href =
+      `/${selectedSlug}/admin/analytics`
+  })
 }
 
 loadAnalyticsButton.addEventListener('click', loadAnalytics)
