@@ -1,6 +1,5 @@
-===================================================
-===========v0.1 – Core Booking System==============
-===================================================
+v0.1 – Core Booking System
+==========================
 Customer booking form
 Admin dashboard
 Create reservations
@@ -9,9 +8,8 @@ Reservation reference generation
 Supabase integration
 Basic branding support
 
-===================================================
-==========v0.2 – Reservation Management================
-===================================================
+v0.2 – Reservation Management
+==============================
 Reservation search by reference
 Reservation status tracking
 Confirmed
@@ -23,9 +21,9 @@ Restore archived reservations
 Permanent deletion with manager password
 Dashboard summary cards
 
-===================================================
-===========v0.3 – Analytics Dashboard================
-===================================================
+
+v0.3 – Analytics Dashboard
+==========================
 Analytics page
 Date range filtering
 Total reservations
@@ -35,9 +33,9 @@ No-show rate
 Archived reservation statistics
 Busiest time calculation
 
-===================================================
-========v0.4 – Industry Flexibility==============
-===================================================
+
+v0.4 – Industry Flexibility
+===========================
 Added business profile settings allowing terminology changes.
 
 Examples:
@@ -67,9 +65,9 @@ Analytics
 Search
 Cancel flows
 
-===================================================
-==========v0.5 – Capacity Tracking Improvements==============
-===================================================
+
+v0.5 – Capacity Tracking Improvements
+=====================================
 Introduced:
 
 Allow Group Bookings
@@ -90,9 +88,9 @@ Chatbot can ignore capacity
 Capacity analytics hidden
 Capacity dashboard cards hidden
 
-===================================================
-==========v0.6 – Custom Fields System=============
-===================================================
+
+v0.6 – Custom Fields System
+===========================
 Added custom booking fields:
 
 Supported types:
@@ -111,9 +109,9 @@ Required fields
 Business-specific fields
 Answers stored with reservation
 
-===================================================
-========v0.7 – Custom Field Management============
-===================================================
+
+v0.7 – Custom Field Management
+==============================
 Added:
 
 Edit Field
@@ -130,9 +128,8 @@ Move Down
 
 Custom fields now appear to customers in configured order.
 
-===================================================
-========v0.8 – Industry Templates==========
-===================================================
+v0.8 – Industry Templates
+=========================
 Added one-click template generation.
 
 Restaurant
@@ -150,9 +147,9 @@ Preferred Therapist
 General
 Empty template
 
-===================================================
-========v0.9 – Scale Dropdown Helper============
-===================================================
+
+v0.9 – Scale Dropdown Helper
+============================
 Added:
 
 Use 1-10 Scale
@@ -177,9 +174,9 @@ Satisfaction ratings
 Priority ratings
 Urgency ratings
 
-===================================================
-========v1.0 – Multi-Business Platform============
-===================================================
+
+v1.0 – Multi-Business Platform
+==============================
 Major milestone.
 
 Introduced:
@@ -206,9 +203,9 @@ Reservations
 Analytics
 Custom fields
 
-===================================================
-======v1.1 – Business Switcher============
-===================================================
+
+v1.1 – Business Switcher
+========================
 Added business selector on:
 
 Dashboard
@@ -226,9 +223,9 @@ Settings
 
 Business switching support.
 
-===================================================
-=========v1.2 – Custom Reference Prefixes===========
-===================================================
+
+v1.2 – Custom Reference Prefixes
+================================
 Businesses can define:
 
 DSD
@@ -245,9 +242,9 @@ AGR-20250827-001
 
 instead of a hardcoded prefix.
 
-===================================================
-========v1.3 – Customer Privacy Notice=============
-===================================================
+
+v1.3 – Customer Privacy Notice
+==============================
 Added customer consent notice:
 
 By submitting this form,
@@ -257,9 +254,9 @@ appointment management purposes.
 
 Displayed below booking form.
 
-===================================================
-=========v1.4 – Dashboard Date Range Filtering==========
-===================================================
+
+v1.4 – Dashboard Date Range Filtering
+======================================
 Replaced single-day dashboard view.
 
 Added:
@@ -274,9 +271,8 @@ Multiple days
 Weekly view
 Monthly view
 
-===================================================
-==========v1.5 – Dashboard Sorting============
-===================================================
+v1.5 – Dashboard Sorting
+========================
 Added:
 
 Earliest First
@@ -287,9 +283,9 @@ Sorting affects:
 Reservation date
 Reservation time
 
-===================================================
-=======v1.6 – Planner View Improvements=============
-===================================================
+v1.6 – Planner View Improvements
+================================
+
 Reservations now grouped by day.
 
 Example:
@@ -319,8 +315,8 @@ Tomorrow
 Next 7 Days
 This Month
 
-===================================================
-========v1.7 – Test Environment & Vercel Improvements===========
+
+v1.7 – Test Environment & Vercel Improvements
 ===================================================
 Added:
 
