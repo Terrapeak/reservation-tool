@@ -1,6 +1,6 @@
 /* Terrapeak admin refinements. Loaded after the base stylesheet. */
 
-body:has(#businessSwitcher) {
+body:has(.admin-nav) {
   --tp-navy: #234a6d;
   --tp-navy-dark: #193a57;
   --tp-accent: #2f5d50;
@@ -12,29 +12,29 @@ body:has(#businessSwitcher) {
   background: var(--tp-page) !important;
 }
 
-body:has(#businessSwitcher) #app {
+body:has(.admin-nav) #app {
   max-width: 1120px !important;
   padding: 38px 32px 64px !important;
 }
 
-body:has(#businessSwitcher) h1,
-body:has(#businessSwitcher) h2,
-body:has(#businessSwitcher) h3 {
+body:has(.admin-nav) h1,
+body:has(.admin-nav) h2,
+body:has(.admin-nav) h3 {
   color: var(--tp-text) !important;
 }
 
-body:has(#businessSwitcher) h1 {
+body:has(.admin-nav) h1 {
   font-size: 28px !important;
   margin-bottom: 22px !important;
 }
 
-body:has(#businessSwitcher) #businessSwitcher {
+body:has(.admin-nav) #businessSwitcher {
   width: 290px !important;
   margin-bottom: 20px !important;
 }
 
 /* Correct active page state */
-body:has(#businessSwitcher) .admin-nav a {
+body:has(.admin-nav) .admin-nav a {
   background: transparent !important;
   color: #587085 !important;
   box-shadow: none !important;
@@ -48,7 +48,7 @@ body:has(#businessSettingsSection) .admin-nav a:nth-child(3) {
   box-shadow: 0 3px 10px rgba(35, 74, 109, 0.18) !important;
 }
 
-body:has(#businessSwitcher) .admin-nav a:hover {
+body:has(.admin-nav) .admin-nav a:hover {
   background: #dfe7ed !important;
   color: var(--tp-navy-dark) !important;
 }
@@ -81,7 +81,7 @@ body:has(#businessSettingsSection) .admin-nav a:nth-child(3):hover {
   margin-bottom: 18px;
 }
 
-body:has(#businessSwitcher) .date-range-presets button {
+body:has(.admin-nav) .date-range-presets button {
   min-height: 36px;
   padding: 8px 13px;
   border-color: var(--tp-border) !important;
@@ -89,8 +89,8 @@ body:has(#businessSwitcher) .date-range-presets button {
   color: var(--tp-navy) !important;
 }
 
-body:has(#businessSwitcher) .date-range-presets button:hover,
-body:has(#businessSwitcher) .date-range-presets button.active {
+body:has(.admin-nav) .date-range-presets button:hover,
+body:has(.admin-nav) .date-range-presets button.active {
   border-color: var(--tp-navy) !important;
   background: var(--tp-navy) !important;
   color: #ffffff !important;
@@ -201,8 +201,8 @@ body:has(#businessSettingsSection) #customFieldsList {
 }
 
 /* Remove client-brand blue from admin controls */
-body:has(#businessSwitcher) button,
-body:has(#businessSwitcher) .settings-tabs button.active {
+body:has(.admin-nav) button,
+body:has(.admin-nav) .settings-tabs button.active {
   background-color: var(--tp-navy);
   border-color: var(--tp-navy);
 }
@@ -214,7 +214,7 @@ body:has(#businessSwitcher) .settings-tabs button.active {
 }
 
 @media (max-width: 620px) {
-  body:has(#businessSwitcher) #app {
+  body:has(.admin-nav) #app {
     padding: 24px 16px 48px !important;
   }
 
