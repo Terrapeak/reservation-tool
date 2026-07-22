@@ -36,6 +36,24 @@ function setActivePreset(container, activeButton) {
   })
 }
 
+function updateDocumentTitle() {
+  const path = window.location.pathname
+
+  if (path.includes('/dashboard/analytics')) {
+    document.title = 'TerraPeak Analytics'
+    return
+  }
+
+  if (path.includes('/dashboard/settings')) {
+    document.title = 'TerraPeak Settings'
+    return
+  }
+
+  if (path.includes('/dashboard')) {
+    document.title = 'TerraPeak Dashboard'
+  }
+}
+
 async function updateDashboardHeading() {
   const heading = await waitForElement('h1')
   if (!heading) return
@@ -152,6 +170,7 @@ function setSettingsTabColors() {
 }
 
 function startEnhancements() {
+  updateDocumentTitle()
   updateDashboardHeading()
   enhanceAnalyticsPage()
   waitForElement('#businessSettingsSection').then(setSettingsTabColors)
