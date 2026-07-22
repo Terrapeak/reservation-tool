@@ -61,15 +61,8 @@ async function updateDashboardHeading() {
   heading.textContent = heading.textContent.replace(' Admin Dashboard', ' Dashboard')
 }
 
-async function enhanceAnalyticsPage() {
-  const analyticsResults = await waitForElement('#analyticsResults')
-  if (!analyticsResults) return
-
-  const startInput = document.getElementById('analyticsStartDate')
-  const endInput = document.getElementById('analyticsEndDate')
-  const loadButton = document.getElementById('loadAnalyticsButton')
-
-  if (!startInput || !endInput || !loadButton) return
+function createDateRangePanel({ startInput, endInput, loadButton, insertBefore }) {
+  if (!startInput || !endInput || !loadButton || !insertBefore) return
 
   const startLabel = startInput.previousElementSibling
   const endLabel = endInput.previousElementSibling
@@ -97,19 +90,20 @@ async function enhanceAnalyticsPage() {
 
   customFields.append(startField, endField)
   panel.append(heading, presets, customFields, loadButton)
-
-  const nav = document.querySelector('.admin-nav')
-  nav?.insertAdjacentElement('afterend', panel)
+  insertBefore.insertAdjacentElement('beforebegin', panel)
 
   document.querySelectorAll('br').forEach((br) => {
     if (!br.parentElement || br.closest('.analytics-filter-panel')) return
-    if (br.previousElementSibling === startInput || br.previousElementSibling === endInput) {
+    if (
+      br.previousElementSibling === startInput ||
+      br.previousElementSibling === endInput ||
+      br.previousElementSibling === loadButton
+    ) {
       br.remove()
     }
   })
 
   const today = new Date()
-
   const options = [
     { label: '7 days', days: 7 },
     { label: '14 days', days: 14 },
@@ -153,6 +147,39 @@ async function enhanceAnalyticsPage() {
   defaultButton?.click()
 }
 
+async function enhanceDashboardPage() {
+  const startInput = await waitForElement('#adminStartDateFilter')
+  if (!startInput) return
+
+  const endInput = document.getElementById('adminEndDateFilter')
+  const loadButton = document.getElementById('loadDateButton')
+  const viewLabel = document.getElementById('showActiveButton')?.previousElementSibling
+
+  createDateRangePanel({
+    startInput,
+    endInput,
+    loadButton,
+    insertBefore: viewLabel || document.getElementById('showActiveButton')
+  })
+}
+
+async function enhanceAnalyticsPage() {
+  const analyticsResults = await waitForElement('#analyticsResults')
+  if (!analyticsResults) return
+
+  const startInput = document.getElementById('analyticsStartDate')
+  const endInput = document.getElementById('analyticsEndDate')
+  const loadButton = document.getElementById('loadAnalyticsButton')
+  const nav = document.querySelector('.admin-nav')
+
+  createDateRangePanel({
+    startInput,
+    endInput,
+    loadButton,
+    insertBefore: nav?.nextElementSibling || analyticsResults
+  })
+}
+
 function setSettingsTabColors() {
   const settingsSection = document.getElementById('businessSettingsSection')
   if (!settingsSection) return
@@ -172,6 +199,7 @@ function setSettingsTabColors() {
 function startEnhancements() {
   updateDocumentTitle()
   updateDashboardHeading()
+  enhanceDashboardPage()
   enhanceAnalyticsPage()
   waitForElement('#businessSettingsSection').then(setSettingsTabColors)
 }
