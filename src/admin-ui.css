@@ -1,0 +1,232 @@
+/* Terrapeak admin refinements. Loaded after the base stylesheet. */
+
+body:has(#businessSwitcher) {
+  --tp-navy: #234a6d;
+  --tp-navy-dark: #193a57;
+  --tp-accent: #2f5d50;
+  --tp-page: #f5f7f9;
+  --tp-panel: #ffffff;
+  --tp-border: #dbe3e9;
+  --tp-text: #1f3040;
+  --tp-muted: #667b8d;
+  background: var(--tp-page) !important;
+}
+
+body:has(#businessSwitcher) #app {
+  max-width: 1120px !important;
+  padding: 38px 32px 64px !important;
+}
+
+body:has(#businessSwitcher) h1,
+body:has(#businessSwitcher) h2,
+body:has(#businessSwitcher) h3 {
+  color: var(--tp-text) !important;
+}
+
+body:has(#businessSwitcher) h1 {
+  font-size: 28px !important;
+  margin-bottom: 22px !important;
+}
+
+body:has(#businessSwitcher) #businessSwitcher {
+  width: 290px !important;
+  margin-bottom: 20px !important;
+}
+
+/* Correct active page state */
+body:has(#businessSwitcher) .admin-nav a {
+  background: transparent !important;
+  color: #587085 !important;
+  box-shadow: none !important;
+}
+
+body:has(#dashboardSummary) .admin-nav a:nth-child(1),
+body:has(#analyticsResults) .admin-nav a:nth-child(2),
+body:has(#businessSettingsSection) .admin-nav a:nth-child(3) {
+  background: var(--tp-navy) !important;
+  color: #ffffff !important;
+  box-shadow: 0 3px 10px rgba(35, 74, 109, 0.18) !important;
+}
+
+body:has(#businessSwitcher) .admin-nav a:hover {
+  background: #dfe7ed !important;
+  color: var(--tp-navy-dark) !important;
+}
+
+body:has(#dashboardSummary) .admin-nav a:nth-child(1):hover,
+body:has(#analyticsResults) .admin-nav a:nth-child(2):hover,
+body:has(#businessSettingsSection) .admin-nav a:nth-child(3):hover {
+  background: var(--tp-navy-dark) !important;
+  color: #ffffff !important;
+}
+
+/* Analytics date presets */
+.analytics-filter-panel {
+  margin: 0 0 24px;
+  padding: 20px;
+  border: 1px solid var(--tp-border);
+  border-radius: 12px;
+  background: var(--tp-panel);
+  box-shadow: 0 6px 20px rgba(31, 58, 81, 0.06);
+}
+
+.analytics-filter-panel > label:first-child {
+  margin-top: 0 !important;
+}
+
+.date-range-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+body:has(#businessSwitcher) .date-range-presets button {
+  min-height: 36px;
+  padding: 8px 13px;
+  border-color: var(--tp-border) !important;
+  background: #ffffff !important;
+  color: var(--tp-navy) !important;
+}
+
+body:has(#businessSwitcher) .date-range-presets button:hover,
+body:has(#businessSwitcher) .date-range-presets button.active {
+  border-color: var(--tp-navy) !important;
+  background: var(--tp-navy) !important;
+  color: #ffffff !important;
+}
+
+.custom-date-fields {
+  display: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.custom-date-fields.visible {
+  display: grid;
+}
+
+.custom-date-fields label {
+  margin-top: 0 !important;
+}
+
+body:has(#analyticsResults) #analyticsStartDate,
+body:has(#analyticsResults) #analyticsEndDate {
+  width: 100% !important;
+  min-height: 42px;
+}
+
+body:has(#analyticsResults) #loadAnalyticsButton {
+  margin-top: 2px;
+}
+
+body:has(#analyticsResults) hr {
+  margin-top: 24px !important;
+}
+
+body:has(#analyticsResults) .summary-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+}
+
+/* Settings structure */
+body:has(#businessSettingsSection) .settings-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--tp-border);
+}
+
+body:has(#businessSettingsSection) .settings-tabs button {
+  border-color: var(--tp-border) !important;
+  background: #ffffff !important;
+  color: var(--tp-navy) !important;
+}
+
+body:has(#businessSettingsSection) .settings-tabs button.active {
+  border-color: var(--tp-navy) !important;
+  background: var(--tp-navy) !important;
+  color: #ffffff !important;
+}
+
+body:has(#businessSettingsSection) #businessSettingsSection,
+body:has(#businessSettingsSection) #operationsSettingsSection,
+body:has(#businessSettingsSection) #brandingSettingsSection {
+  max-width: 820px;
+}
+
+body:has(#businessSettingsSection) form {
+  max-width: none !important;
+  margin: 0 0 18px !important;
+  padding: 24px !important;
+  border: 1px solid var(--tp-border);
+  border-radius: 12px !important;
+  box-shadow: 0 6px 20px rgba(31, 58, 81, 0.06) !important;
+}
+
+body:has(#businessSettingsSection) form h2 {
+  margin: 0 0 20px !important;
+  font-size: 20px;
+}
+
+body:has(#businessSettingsSection) form input:not([type="checkbox"]):not([type="color"]):not([type="file"]),
+body:has(#businessSettingsSection) form select,
+body:has(#businessSettingsSection) form textarea {
+  max-width: 100%;
+  min-height: 42px;
+}
+
+body:has(#businessSettingsSection) form input[type="checkbox"] {
+  width: auto !important;
+  margin-right: 8px;
+}
+
+body:has(#businessSettingsSection) form label:has(input[type="checkbox"]) {
+  display: flex !important;
+  align-items: center;
+}
+
+body:has(#businessSettingsSection) #businessProfileForm,
+body:has(#businessSettingsSection) #operationalSettingsForm,
+body:has(#businessSettingsSection) #brandingForm,
+body:has(#businessSettingsSection) #logoForm,
+body:has(#businessSettingsSection) #customFieldForm {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+body:has(#businessSettingsSection) #customFieldsList {
+  margin-bottom: 20px;
+}
+
+/* Remove client-brand blue from admin controls */
+body:has(#businessSwitcher) button,
+body:has(#businessSwitcher) .settings-tabs button.active {
+  background-color: var(--tp-navy);
+  border-color: var(--tp-navy);
+}
+
+@media (max-width: 850px) {
+  body:has(#analyticsResults) .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 620px) {
+  body:has(#businessSwitcher) #app {
+    padding: 24px 16px 48px !important;
+  }
+
+  .custom-date-fields {
+    grid-template-columns: 1fr;
+  }
+
+  body:has(#analyticsResults) .summary-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  body:has(#businessSettingsSection) .settings-tabs {
+    overflow-x: auto;
+  }
+}
