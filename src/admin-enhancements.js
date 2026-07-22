@@ -36,6 +36,13 @@ function setActivePreset(container, activeButton) {
   })
 }
 
+async function updateDashboardHeading() {
+  const heading = await waitForElement('h1')
+  if (!heading) return
+
+  heading.textContent = heading.textContent.replace(' Admin Dashboard', ' Dashboard')
+}
+
 async function enhanceAnalyticsPage() {
   const analyticsResults = await waitForElement('#analyticsResults')
   if (!analyticsResults) return
@@ -145,6 +152,7 @@ function setSettingsTabColors() {
 }
 
 function startEnhancements() {
+  updateDashboardHeading()
   enhanceAnalyticsPage()
   waitForElement('#businessSettingsSection').then(setSettingsTabColors)
 }
