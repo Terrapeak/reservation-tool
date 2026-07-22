@@ -23,6 +23,16 @@
         const publicPath = window.location.pathname.replace('/admin', '/dashboard')
         window.history.replaceState({}, '', `${publicPath}${window.location.search}${window.location.hash}`)
       }
+
+      const currentPath = window.location.pathname
+
+      if (currentPath.includes('/dashboard/analytics')) {
+        document.title = 'TerraPeak Analytics'
+      } else if (currentPath.includes('/dashboard/settings')) {
+        document.title = 'TerraPeak Settings'
+      } else if (currentPath.includes('/dashboard')) {
+        document.title = 'TerraPeak Dashboard'
+      }
     </script>
   </body>
 </html>
