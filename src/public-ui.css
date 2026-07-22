@@ -1,6 +1,6 @@
 /* Public reservation page styling. Admin pages are excluded. */
 
-body:not(:has(#businessSwitcher)) {
+body:not(:has(.admin-nav)) {
   --tp-navy: #234a6d;
   --tp-navy-dark: #193a57;
   --tp-accent: #2f5d50;
@@ -15,19 +15,19 @@ body:not(:has(#businessSwitcher)) {
   color: var(--tp-text) !important;
 }
 
-body:not(:has(#businessSwitcher)) #app {
+body:not(:has(.admin-nav)) #app {
   max-width: 760px !important;
   margin: 0 auto !important;
   padding: 56px 24px 72px !important;
 }
 
-body:not(:has(#businessSwitcher)) .brand-logo {
+body:not(:has(.admin-nav)) .brand-logo {
   max-width: 120px !important;
   max-height: 72px !important;
   margin: 0 auto 18px !important;
 }
 
-body:not(:has(#businessSwitcher)) h1 {
+body:not(:has(.admin-nav)) h1 {
   margin: 0 0 10px !important;
   color: var(--tp-text) !important;
   font-size: 34px !important;
@@ -36,7 +36,7 @@ body:not(:has(#businessSwitcher)) h1 {
   text-align: center !important;
 }
 
-body:not(:has(#businessSwitcher)) h1::after {
+body:not(:has(.admin-nav)) h1::after {
   content: 'Book your preferred date and time below.';
   display: block;
   max-width: 520px;
@@ -48,7 +48,7 @@ body:not(:has(#businessSwitcher)) h1::after {
   letter-spacing: 0;
 }
 
-body:not(:has(#businessSwitcher)) form {
+body:not(:has(.admin-nav)) form {
   max-width: none !important;
   margin: 0 auto 24px !important;
   padding: 28px !important;
@@ -58,11 +58,11 @@ body:not(:has(#businessSwitcher)) form {
   box-shadow: 0 10px 30px rgba(31, 58, 81, 0.08) !important;
 }
 
-body:not(:has(#businessSwitcher)) #reservationForm {
+body:not(:has(.admin-nav)) #reservationForm {
   position: relative;
 }
 
-body:not(:has(#businessSwitcher)) #reservationForm::before {
+body:not(:has(.admin-nav)) #reservationForm::before {
   content: 'Reservation details';
   display: block;
   margin-bottom: 20px;
@@ -71,9 +71,9 @@ body:not(:has(#businessSwitcher)) #reservationForm::before {
   font-weight: 700;
 }
 
-body:not(:has(#businessSwitcher)) input,
-body:not(:has(#businessSwitcher)) textarea,
-body:not(:has(#businessSwitcher)) select {
+body:not(:has(.admin-nav)) input,
+body:not(:has(.admin-nav)) textarea,
+body:not(:has(.admin-nav)) select {
   min-height: 46px;
   padding: 12px 14px !important;
   border: 1px solid var(--tp-border) !important;
@@ -85,24 +85,24 @@ body:not(:has(#businessSwitcher)) select {
   outline: none;
 }
 
-body:not(:has(#businessSwitcher)) textarea {
+body:not(:has(.admin-nav)) textarea {
   min-height: 100px !important;
   resize: vertical;
 }
 
-body:not(:has(#businessSwitcher)) input:focus,
-body:not(:has(#businessSwitcher)) textarea:focus,
-body:not(:has(#businessSwitcher)) select:focus {
+body:not(:has(.admin-nav)) input:focus,
+body:not(:has(.admin-nav)) textarea:focus,
+body:not(:has(.admin-nav)) select:focus {
   border-color: var(--tp-navy) !important;
   box-shadow: 0 0 0 3px rgba(35, 74, 109, 0.12) !important;
 }
 
-body:not(:has(#businessSwitcher)) input::placeholder,
-body:not(:has(#businessSwitcher)) textarea::placeholder {
+body:not(:has(.admin-nav)) input::placeholder,
+body:not(:has(.admin-nav)) textarea::placeholder {
   color: #8a9aaa;
 }
 
-body:not(:has(#businessSwitcher)) button {
+body:not(:has(.admin-nav)) button {
   min-height: 46px;
   padding: 12px 18px !important;
   border: 1px solid var(--tp-navy) !important;
@@ -115,77 +115,77 @@ body:not(:has(#businessSwitcher)) button {
   transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 
-body:not(:has(#businessSwitcher)) button:hover {
+body:not(:has(.admin-nav)) button:hover {
   border-color: var(--tp-navy-dark) !important;
   background: var(--tp-navy-dark) !important;
   transform: translateY(-1px);
 }
 
-body:not(:has(#businessSwitcher)) #reservationForm button[type='submit'] {
+body:not(:has(.admin-nav)) #reservationForm button[type='submit'] {
   width: 100%;
   margin-top: 4px;
 }
 
-body:not(:has(#businessSwitcher)) hr {
+body:not(:has(.admin-nav)) hr {
   margin: 30px 0 !important;
   border-top: 1px solid var(--tp-border) !important;
 }
 
-body:not(:has(#businessSwitcher)) #message,
-body:not(:has(#businessSwitcher)) #cancelMessage {
+body:not(:has(.admin-nav)) #message,
+body:not(:has(.admin-nav)) #cancelMessage {
   margin: 0 0 20px;
   padding: 0;
   font-size: 15px !important;
   line-height: 1.6;
 }
 
-body:not(:has(#businessSwitcher)) h2 {
+body:not(:has(.admin-nav)) h2 {
   margin: 0 0 14px !important;
   color: var(--tp-text) !important;
   font-size: 20px !important;
   text-align: left;
 }
 
-body:not(:has(#businessSwitcher)) #cancelForm {
+body:not(:has(.admin-nav)) #cancelForm {
   padding: 24px !important;
   box-shadow: none !important;
   background: #f9fbfc !important;
 }
 
-body:not(:has(#businessSwitcher)) #cancelForm button {
+body:not(:has(.admin-nav)) #cancelForm button {
   width: 100%;
   border-color: var(--tp-border) !important;
   background: #ffffff !important;
   color: var(--tp-navy) !important;
 }
 
-body:not(:has(#businessSwitcher)) #cancelForm button:hover {
+body:not(:has(.admin-nav)) #cancelForm button:hover {
   border-color: var(--tp-navy) !important;
   background: var(--tp-soft) !important;
   color: var(--tp-navy-dark) !important;
 }
 
-body:not(:has(#businessSwitcher)) form p[style*='font-size:12px'] {
+body:not(:has(.admin-nav)) form p[style*='font-size:12px'] {
   margin: 14px 0 0 !important;
   color: var(--tp-muted) !important;
   line-height: 1.5;
   text-align: center;
 }
 
-body:not(:has(#businessSwitcher)) label {
+body:not(:has(.admin-nav)) label {
   color: var(--tp-text);
   font-size: 14px;
   line-height: 1.5;
 }
 
-body:not(:has(#businessSwitcher)) label:has(input[type='checkbox']) {
+body:not(:has(.admin-nav)) label:has(input[type='checkbox']) {
   display: flex;
   align-items: center;
   gap: 9px;
   padding: 10px 0;
 }
 
-body:not(:has(#businessSwitcher)) input[type='checkbox'] {
+body:not(:has(.admin-nav)) input[type='checkbox'] {
   width: 18px !important;
   min-height: 18px !important;
   height: 18px;
@@ -194,15 +194,15 @@ body:not(:has(#businessSwitcher)) input[type='checkbox'] {
 }
 
 @media (max-width: 640px) {
-  body:not(:has(#businessSwitcher)) #app {
+  body:not(:has(.admin-nav)) #app {
     padding: 34px 16px 48px !important;
   }
 
-  body:not(:has(#businessSwitcher)) h1 {
+  body:not(:has(.admin-nav)) h1 {
     font-size: 28px !important;
   }
 
-  body:not(:has(#businessSwitcher)) form {
+  body:not(:has(.admin-nav)) form {
     padding: 22px !important;
     border-radius: 12px !important;
   }
