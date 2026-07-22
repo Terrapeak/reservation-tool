@@ -2,6 +2,8 @@ const searchParams = new URLSearchParams(window.location.search)
 const isCustomerView = searchParams.get('customerView') === '1'
 
 if (isCustomerView) {
+  document.body.classList.add('customer-reservations-view')
+
   const lockedBusinessSlug = window.location.pathname.split('/').filter(Boolean)[0]
 
   const secureCustomerView = () => {
