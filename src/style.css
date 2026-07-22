@@ -19,6 +19,20 @@
   --divider-color: #e0c8b8;
 
   --shadow-color: rgba(0, 0, 0, 0.12);
+
+  /* Terrapeak admin dashboard palette */
+  --tp-navy: #234a6d;
+  --tp-navy-dark: #193a57;
+  --tp-navy-soft: #315b7e;
+  --tp-slate: #61788c;
+  --tp-muted: #8fa2b2;
+  --tp-page: #f6f8fa;
+  --tp-panel: #ffffff;
+  --tp-border: #dfe6ec;
+  --tp-border-strong: #cfd9e2;
+  --tp-text: #20303f;
+  --tp-text-muted: #66798a;
+  --tp-shadow: 0 8px 24px rgba(31, 58, 81, 0.08);
 }
 
 body {
@@ -171,4 +185,265 @@ hr {
   margin: 0;
   font-size: 30px;
   font-weight: bold;
+}
+
+/* =========================================
+   TERRAPEAK ADMIN DASHBOARD
+   Scoped to admin pages so customer booking
+   pages keep their individual branding.
+========================================= */
+
+body:has(#businessSwitcher) {
+  background: var(--tp-page);
+  color: var(--tp-text);
+}
+
+body:has(#businessSwitcher) #app {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 42px 36px 70px;
+}
+
+body:has(#businessSwitcher) .brand-logo {
+  max-width: 110px;
+  max-height: 70px;
+  margin: 0 0 16px;
+}
+
+body:has(#businessSwitcher) h1 {
+  margin: 0 0 28px;
+  text-align: left;
+  color: var(--tp-text);
+  font-size: 30px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+body:has(#businessSwitcher) #businessSwitcher {
+  width: min(320px, 100%);
+  min-height: 42px;
+  margin: 0 0 22px;
+  padding: 0 38px 0 13px;
+  border: 1px solid var(--tp-border-strong);
+  border-radius: 9px;
+  background: var(--tp-panel);
+  color: var(--tp-text);
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+body:has(#businessSwitcher) .admin-nav {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  width: fit-content;
+  margin: 0 0 26px;
+  padding: 5px;
+  border: 1px solid var(--tp-border);
+  border-radius: 11px;
+  background: #edf2f6;
+  text-align: left;
+}
+
+body:has(#businessSwitcher) .admin-nav a {
+  margin: 0;
+  padding: 9px 16px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tp-slate);
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+body:has(#businessSwitcher) .admin-nav a:first-child {
+  background: var(--tp-navy);
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(35, 74, 109, 0.18);
+}
+
+body:has(#businessSwitcher) .admin-nav a:hover {
+  background: #dfe8ef;
+  color: var(--tp-navy-dark);
+}
+
+body:has(#businessSwitcher) .admin-nav a:first-child:hover {
+  background: var(--tp-navy-dark);
+  color: #ffffff;
+}
+
+body:has(#businessSwitcher) input,
+body:has(#businessSwitcher) textarea,
+body:has(#businessSwitcher) select {
+  border-color: var(--tp-border-strong);
+  background: #ffffff;
+  color: var(--tp-text);
+  outline: none;
+  box-shadow: none;
+}
+
+body:has(#businessSwitcher) input:focus,
+body:has(#businessSwitcher) textarea:focus,
+body:has(#businessSwitcher) select:focus {
+  border-color: var(--tp-navy-soft);
+  box-shadow: 0 0 0 3px rgba(49, 91, 126, 0.12);
+}
+
+body:has(#businessSwitcher) label {
+  display: block;
+  margin: 16px 0 7px;
+  color: var(--tp-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+body:has(#businessSwitcher) #searchReference {
+  display: inline-block;
+  width: min(410px, 100%);
+  max-width: none;
+  min-height: 42px;
+  margin: 0 7px 10px 0;
+}
+
+body:has(#businessSwitcher) button {
+  min-height: 40px;
+  padding: 10px 15px;
+  border: 1px solid var(--tp-navy);
+  border-radius: 8px;
+  background: var(--tp-navy);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: none;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+body:has(#businessSwitcher) button:hover {
+  border-color: var(--tp-navy-dark);
+  background: var(--tp-navy-dark);
+  transform: translateY(-1px);
+}
+
+body:has(#businessSwitcher) #refreshButton,
+body:has(#businessSwitcher) #showArchivedButton,
+body:has(#businessSwitcher) #showAllButton {
+  border-color: var(--tp-border-strong);
+  background: #ffffff;
+  color: var(--tp-navy);
+}
+
+body:has(#businessSwitcher) #refreshButton:hover,
+body:has(#businessSwitcher) #showArchivedButton:hover,
+body:has(#businessSwitcher) #showAllButton:hover {
+  border-color: var(--tp-navy);
+  background: #edf3f7;
+}
+
+body:has(#businessSwitcher) #adminStartDateFilter,
+body:has(#businessSwitcher) #adminEndDateFilter {
+  width: calc(50% - 8px);
+  min-height: 42px;
+  margin-right: 8px;
+}
+
+body:has(#businessSwitcher) #loadDateButton {
+  margin-top: 10px;
+}
+
+body:has(#businessSwitcher) hr {
+  margin: 27px 0;
+  border-top-color: var(--tp-border);
+}
+
+body:has(#businessSwitcher) .summary-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 26px;
+}
+
+body:has(#businessSwitcher) .summary-card {
+  min-height: 92px;
+  padding: 17px 14px;
+  border: 1px solid var(--tp-border);
+  border-top: 1px solid var(--tp-border);
+  border-radius: 11px;
+  background: var(--tp-panel);
+  box-shadow: var(--tp-shadow);
+  text-align: left;
+}
+
+body:has(#businessSwitcher) .summary-card h3 {
+  margin: 0 0 13px;
+  color: var(--tp-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+body:has(#businessSwitcher) .summary-card p {
+  color: var(--tp-text);
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+body:has(#businessSwitcher) #adminReservations {
+  color: var(--tp-text-muted);
+  font-size: 14px;
+}
+
+body:has(#businessSwitcher) #adminReservations > div {
+  margin-bottom: 12px !important;
+  padding: 18px !important;
+  border: 1px solid var(--tp-border) !important;
+  border-left: 4px solid var(--tp-navy) !important;
+  border-radius: 10px !important;
+  background: var(--tp-panel);
+  box-shadow: 0 5px 16px rgba(31, 58, 81, 0.06);
+}
+
+body:has(#businessSwitcher) #adminReservations p {
+  color: var(--tp-text);
+}
+
+@media (max-width: 900px) {
+  body:has(#businessSwitcher) #app {
+    padding: 28px 20px 50px;
+  }
+
+  body:has(#businessSwitcher) .summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  body:has(#businessSwitcher) h1 {
+    font-size: 25px;
+  }
+
+  body:has(#businessSwitcher) .admin-nav {
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: auto;
+  }
+
+  body:has(#businessSwitcher) .admin-nav a {
+    flex: 1;
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  body:has(#businessSwitcher) #searchReference,
+  body:has(#businessSwitcher) #adminStartDateFilter,
+  body:has(#businessSwitcher) #adminEndDateFilter {
+    width: 100%;
+    margin-right: 0;
+  }
+
+  body:has(#businessSwitcher) button {
+    margin-bottom: 7px;
+  }
+
+  body:has(#businessSwitcher) .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
