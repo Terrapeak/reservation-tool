@@ -1,0 +1,209 @@
+/* Public reservation page styling. Admin pages are excluded. */
+
+body:not(:has(#businessSwitcher)) {
+  --tp-navy: #234a6d;
+  --tp-navy-dark: #193a57;
+  --tp-accent: #2f5d50;
+  --tp-page: #f5f7f9;
+  --tp-panel: #ffffff;
+  --tp-border: #dbe3e9;
+  --tp-text: #1f3040;
+  --tp-muted: #667b8d;
+  --tp-soft: #edf2f5;
+  min-height: 100vh;
+  background: var(--tp-page) !important;
+  color: var(--tp-text) !important;
+}
+
+body:not(:has(#businessSwitcher)) #app {
+  max-width: 760px !important;
+  margin: 0 auto !important;
+  padding: 56px 24px 72px !important;
+}
+
+body:not(:has(#businessSwitcher)) .brand-logo {
+  max-width: 120px !important;
+  max-height: 72px !important;
+  margin: 0 auto 18px !important;
+}
+
+body:not(:has(#businessSwitcher)) h1 {
+  margin: 0 0 10px !important;
+  color: var(--tp-text) !important;
+  font-size: 34px !important;
+  line-height: 1.15 !important;
+  letter-spacing: -0.02em;
+  text-align: center !important;
+}
+
+body:not(:has(#businessSwitcher)) h1::after {
+  content: 'Book your preferred date and time below.';
+  display: block;
+  max-width: 520px;
+  margin: 12px auto 30px;
+  color: var(--tp-muted);
+  font-size: 15px;
+  line-height: 1.6;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+body:not(:has(#businessSwitcher)) form {
+  max-width: none !important;
+  margin: 0 auto 24px !important;
+  padding: 28px !important;
+  border: 1px solid var(--tp-border);
+  border-radius: 14px !important;
+  background: var(--tp-panel) !important;
+  box-shadow: 0 10px 30px rgba(31, 58, 81, 0.08) !important;
+}
+
+body:not(:has(#businessSwitcher)) #reservationForm {
+  position: relative;
+}
+
+body:not(:has(#businessSwitcher)) #reservationForm::before {
+  content: 'Reservation details';
+  display: block;
+  margin-bottom: 20px;
+  color: var(--tp-text);
+  font-size: 19px;
+  font-weight: 700;
+}
+
+body:not(:has(#businessSwitcher)) input,
+body:not(:has(#businessSwitcher)) textarea,
+body:not(:has(#businessSwitcher)) select {
+  min-height: 46px;
+  padding: 12px 14px !important;
+  border: 1px solid var(--tp-border) !important;
+  border-radius: 9px !important;
+  background: #ffffff !important;
+  color: var(--tp-text) !important;
+  font-size: 15px !important;
+  box-shadow: none !important;
+  outline: none;
+}
+
+body:not(:has(#businessSwitcher)) textarea {
+  min-height: 100px !important;
+  resize: vertical;
+}
+
+body:not(:has(#businessSwitcher)) input:focus,
+body:not(:has(#businessSwitcher)) textarea:focus,
+body:not(:has(#businessSwitcher)) select:focus {
+  border-color: var(--tp-navy) !important;
+  box-shadow: 0 0 0 3px rgba(35, 74, 109, 0.12) !important;
+}
+
+body:not(:has(#businessSwitcher)) input::placeholder,
+body:not(:has(#businessSwitcher)) textarea::placeholder {
+  color: #8a9aaa;
+}
+
+body:not(:has(#businessSwitcher)) button {
+  min-height: 46px;
+  padding: 12px 18px !important;
+  border: 1px solid var(--tp-navy) !important;
+  border-radius: 9px !important;
+  background: var(--tp-navy) !important;
+  color: #ffffff !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  box-shadow: none !important;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+body:not(:has(#businessSwitcher)) button:hover {
+  border-color: var(--tp-navy-dark) !important;
+  background: var(--tp-navy-dark) !important;
+  transform: translateY(-1px);
+}
+
+body:not(:has(#businessSwitcher)) #reservationForm button[type='submit'] {
+  width: 100%;
+  margin-top: 4px;
+}
+
+body:not(:has(#businessSwitcher)) hr {
+  margin: 30px 0 !important;
+  border-top: 1px solid var(--tp-border) !important;
+}
+
+body:not(:has(#businessSwitcher)) #message,
+body:not(:has(#businessSwitcher)) #cancelMessage {
+  margin: 0 0 20px;
+  padding: 0;
+  font-size: 15px !important;
+  line-height: 1.6;
+}
+
+body:not(:has(#businessSwitcher)) h2 {
+  margin: 0 0 14px !important;
+  color: var(--tp-text) !important;
+  font-size: 20px !important;
+  text-align: left;
+}
+
+body:not(:has(#businessSwitcher)) #cancelForm {
+  padding: 24px !important;
+  box-shadow: none !important;
+  background: #f9fbfc !important;
+}
+
+body:not(:has(#businessSwitcher)) #cancelForm button {
+  width: 100%;
+  border-color: var(--tp-border) !important;
+  background: #ffffff !important;
+  color: var(--tp-navy) !important;
+}
+
+body:not(:has(#businessSwitcher)) #cancelForm button:hover {
+  border-color: var(--tp-navy) !important;
+  background: var(--tp-soft) !important;
+  color: var(--tp-navy-dark) !important;
+}
+
+body:not(:has(#businessSwitcher)) form p[style*='font-size:12px'] {
+  margin: 14px 0 0 !important;
+  color: var(--tp-muted) !important;
+  line-height: 1.5;
+  text-align: center;
+}
+
+body:not(:has(#businessSwitcher)) label {
+  color: var(--tp-text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+body:not(:has(#businessSwitcher)) label:has(input[type='checkbox']) {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 0;
+}
+
+body:not(:has(#businessSwitcher)) input[type='checkbox'] {
+  width: 18px !important;
+  min-height: 18px !important;
+  height: 18px;
+  padding: 0 !important;
+  accent-color: var(--tp-accent);
+}
+
+@media (max-width: 640px) {
+  body:not(:has(#businessSwitcher)) #app {
+    padding: 34px 16px 48px !important;
+  }
+
+  body:not(:has(#businessSwitcher)) h1 {
+    font-size: 28px !important;
+  }
+
+  body:not(:has(#businessSwitcher)) form {
+    padding: 22px !important;
+    border-radius: 12px !important;
+  }
+}
