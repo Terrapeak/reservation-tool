@@ -7,14 +7,21 @@ body:has(.admin-nav) {
   --tp-page: #f5f7f9;
   --tp-panel: #ffffff;
   --tp-border: #dbe3e9;
+  --tp-border-strong: #cfd9e2;
   --tp-text: #1f3040;
   --tp-muted: #667b8d;
+  --tp-text-muted: #66798a;
+  --tp-shadow: 0 8px 24px rgba(31, 58, 81, 0.08);
   background: var(--tp-page) !important;
+  color: var(--tp-text);
 }
 
 body:has(.admin-nav) #app {
-  max-width: 1120px !important;
+  width: 100%;
+  max-width: 1180px !important;
+  margin: 0 auto !important;
   padding: 38px 32px 64px !important;
+  box-sizing: border-box;
 }
 
 body:has(.admin-nav) h1,
@@ -24,20 +31,41 @@ body:has(.admin-nav) h3 {
 }
 
 body:has(.admin-nav) h1 {
-  font-size: 28px !important;
-  margin-bottom: 22px !important;
+  margin: 0 0 28px !important;
+  text-align: left !important;
+  font-size: 30px !important;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 body:has(.admin-nav) #businessSwitcher {
-  width: 290px !important;
-  margin-bottom: 20px !important;
+  width: min(320px, 100%) !important;
+  min-height: 42px;
+  margin: 0 0 22px !important;
 }
 
-/* Correct active page state */
+body:has(.admin-nav) .admin-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  margin: 0 0 26px;
+  padding: 5px;
+  border: 1px solid var(--tp-border);
+  border-radius: 11px;
+  background: #edf2f6;
+  text-align: left;
+}
+
 body:has(.admin-nav) .admin-nav a {
+  margin: 0 !important;
+  padding: 9px 16px !important;
+  border-radius: 8px;
   background: transparent !important;
   color: #587085 !important;
   box-shadow: none !important;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 body:has(#dashboardSummary) .admin-nav a:nth-child(1),
@@ -60,14 +88,86 @@ body:has(#businessSettingsSection) .admin-nav a:nth-child(3):hover {
   color: #ffffff !important;
 }
 
-/* Analytics date presets */
+body:has(.admin-nav) input,
+body:has(.admin-nav) textarea,
+body:has(.admin-nav) select {
+  border-color: var(--tp-border-strong) !important;
+  background: #ffffff;
+  color: var(--tp-text);
+  outline: none;
+  box-shadow: none;
+}
+
+body:has(.admin-nav) input:focus,
+body:has(.admin-nav) textarea:focus,
+body:has(.admin-nav) select:focus {
+  border-color: #315b7e !important;
+  box-shadow: 0 0 0 3px rgba(49, 91, 126, 0.12) !important;
+}
+
+body:has(.admin-nav) label {
+  display: block;
+  margin: 16px 0 7px;
+  color: var(--tp-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+body:has(.admin-nav) #searchReference {
+  display: inline-block;
+  width: min(410px, 100%);
+  max-width: none;
+  min-height: 42px;
+  margin: 0 7px 10px 0;
+}
+
+body:has(.admin-nav) button {
+  min-height: 40px;
+  padding: 10px 15px;
+  border: 1px solid var(--tp-navy);
+  border-radius: 8px;
+  background: var(--tp-navy);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+body:has(.admin-nav) button:hover {
+  border-color: var(--tp-navy-dark);
+  background: var(--tp-navy-dark);
+}
+
+body:has(.admin-nav) #refreshButton,
+body:has(.admin-nav) #showArchivedButton,
+body:has(.admin-nav) #showAllButton {
+  border-color: var(--tp-border-strong);
+  background: #ffffff;
+  color: var(--tp-navy);
+}
+
+body:has(.admin-nav) #refreshButton:hover,
+body:has(.admin-nav) #showArchivedButton:hover,
+body:has(.admin-nav) #showAllButton:hover {
+  border-color: var(--tp-navy);
+  background: #edf3f7;
+}
+
+body:has(.admin-nav) hr {
+  margin: 27px 0;
+  border-top-color: var(--tp-border);
+}
+
+/* Analytics and dashboard date presets */
 .analytics-filter-panel {
+  width: 100%;
   margin: 0 0 24px;
   padding: 20px;
   border: 1px solid var(--tp-border);
   border-radius: 12px;
   background: var(--tp-panel);
   box-shadow: 0 6px 20px rgba(31, 58, 81, 0.06);
+  box-sizing: border-box;
 }
 
 .analytics-filter-panel > label:first-child {
@@ -125,8 +225,54 @@ body:has(#analyticsResults) hr {
   margin-top: 24px !important;
 }
 
+body:has(.admin-nav) .summary-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+  margin: 0 0 26px !important;
+}
+
+body:has(.admin-nav) .summary-card {
+  min-height: 92px;
+  padding: 17px 14px !important;
+  border: 1px solid var(--tp-border) !important;
+  border-top: 1px solid var(--tp-border) !important;
+  border-radius: 11px !important;
+  background: var(--tp-panel);
+  box-shadow: var(--tp-shadow) !important;
+  text-align: left !important;
+}
+
+body:has(.admin-nav) .summary-card h3 {
+  margin: 0 0 13px !important;
+  color: var(--tp-text-muted) !important;
+  font-size: 12px !important;
+  font-weight: 600;
+}
+
+body:has(.admin-nav) .summary-card p {
+  color: var(--tp-text) !important;
+  font-size: 26px !important;
+  line-height: 1;
+  font-weight: 700;
+}
+
 body:has(#analyticsResults) .summary-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+}
+
+body:has(.admin-nav) #adminReservations {
+  color: var(--tp-text-muted);
+  font-size: 14px;
+}
+
+body:has(.admin-nav) #adminReservations > div {
+  margin-bottom: 12px !important;
+  padding: 18px !important;
+  border: 1px solid var(--tp-border) !important;
+  border-left: 4px solid var(--tp-navy) !important;
+  border-radius: 10px !important;
+  background: var(--tp-panel);
+  box-shadow: 0 5px 16px rgba(31, 58, 81, 0.06) !important;
 }
 
 /* Settings structure */
@@ -200,11 +346,10 @@ body:has(#businessSettingsSection) #customFieldsList {
   margin-bottom: 20px;
 }
 
-/* Remove client-brand blue from admin controls */
-body:has(.admin-nav) button,
-body:has(.admin-nav) .settings-tabs button.active {
-  background-color: var(--tp-navy);
-  border-color: var(--tp-navy);
+@media (max-width: 1100px) {
+  body:has(.admin-nav) .summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
 }
 
 @media (max-width: 850px) {
@@ -218,10 +363,28 @@ body:has(.admin-nav) .settings-tabs button.active {
     padding: 24px 16px 48px !important;
   }
 
+  body:has(.admin-nav) .admin-nav {
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: auto;
+  }
+
+  body:has(.admin-nav) .admin-nav a {
+    flex: 1;
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  body:has(.admin-nav) #searchReference {
+    width: 100%;
+    margin-right: 0;
+  }
+
   .custom-date-fields {
     grid-template-columns: 1fr;
   }
 
+  body:has(.admin-nav) .summary-grid,
   body:has(#analyticsResults) .summary-grid {
     grid-template-columns: 1fr !important;
   }
