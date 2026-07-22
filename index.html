@@ -8,33 +8,4 @@
     <link rel="stylesheet" href="/src/customer-view.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TerraPeak Reservations</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script>
-      if (window.location.pathname.includes('/dashboard')) {
-        const internalPath = window.location.pathname.replace('/dashboard', '/admin')
-        window.history.replaceState({}, '', `${internalPath}${window.location.search}${window.location.hash}`)
-      }
-    </script>
-    <script type="module" src="/src/main.js"></script>
-    <script type="module" src="/src/admin-enhancements.js"></script>
-    <script type="module" src="/src/customer-tenant-lock.js"></script>
-    <script type="module">
-      if (window.location.pathname.includes('/admin')) {
-        const publicPath = window.location.pathname.replace('/admin', '/dashboard')
-        window.history.replaceState({}, '', `${publicPath}${window.location.search}${window.location.hash}`)
-      }
-
-      const currentPath = window.location.pathname
-
-      if (currentPath.includes('/dashboard/analytics')) {
-        document.title = 'TerraPeak Analytics'
-      } else if (currentPath.includes('/dashboard/settings')) {
-        document.title = 'TerraPeak Settings'
-      } else if (currentPath.includes('/dashboard')) {
-        document.title = 'TerraPeak Dashboard'
-      }
-    </script>
-  </body>
-</html>
+ 
