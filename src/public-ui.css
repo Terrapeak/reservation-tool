@@ -1,17 +1,16 @@
 /* Public reservation page styling. Admin pages are excluded. */
 
 body:not(:has(.admin-nav)) {
-  --tp-navy: #234a6d;
-  --tp-navy-dark: #193a57;
-  --tp-accent: #2f5d50;
-  --tp-page: #f5f7f9;
+  --tp-navy: var(--primary-color);
+  --tp-navy-dark: var(--primary-dark-color);
+  --tp-accent: var(--primary-color);
   --tp-panel: #ffffff;
   --tp-border: #dbe3e9;
   --tp-text: #1f3040;
   --tp-muted: #667b8d;
-  --tp-soft: #edf2f5;
+  --tp-soft: rgba(255, 255, 255, 0.72);
   min-height: 100vh;
-  background: var(--tp-page) !important;
+  background: linear-gradient(135deg, var(--background-start), var(--background-end)) !important;
   color: var(--tp-text) !important;
 }
 
@@ -94,7 +93,7 @@ body:not(:has(.admin-nav)) input:focus,
 body:not(:has(.admin-nav)) textarea:focus,
 body:not(:has(.admin-nav)) select:focus {
   border-color: var(--tp-navy) !important;
-  box-shadow: 0 0 0 3px rgba(35, 74, 109, 0.12) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tp-navy) 18%, transparent) !important;
 }
 
 body:not(:has(.admin-nav)) input::placeholder,
@@ -112,12 +111,11 @@ body:not(:has(.admin-nav)) button {
   font-size: 14px !important;
   font-weight: 700 !important;
   box-shadow: none !important;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  transition: filter 0.15s ease, transform 0.15s ease;
 }
 
 body:not(:has(.admin-nav)) button:hover {
-  border-color: var(--tp-navy-dark) !important;
-  background: var(--tp-navy-dark) !important;
+  filter: brightness(0.88);
   transform: translateY(-1px);
 }
 
@@ -149,20 +147,18 @@ body:not(:has(.admin-nav)) h2 {
 body:not(:has(.admin-nav)) #cancelForm {
   padding: 24px !important;
   box-shadow: none !important;
-  background: #f9fbfc !important;
+  background: rgba(255, 255, 255, 0.78) !important;
 }
 
 body:not(:has(.admin-nav)) #cancelForm button {
   width: 100%;
-  border-color: var(--tp-border) !important;
+  border-color: var(--tp-navy) !important;
   background: #ffffff !important;
   color: var(--tp-navy) !important;
 }
 
 body:not(:has(.admin-nav)) #cancelForm button:hover {
-  border-color: var(--tp-navy) !important;
   background: var(--tp-soft) !important;
-  color: var(--tp-navy-dark) !important;
 }
 
 body:not(:has(.admin-nav)) form p[style*='font-size:12px'] {
