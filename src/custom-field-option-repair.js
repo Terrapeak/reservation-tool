@@ -90,6 +90,47 @@ async function repairDropdowns() {
   fields.forEach(populateDropdown)
 }
 
+function showSettingsMessage(message, isError = false) {
+  const messageBox = document.getElementById('brandingMessage')
+  if (!messageBox) return
+  messageBox.innerHTML = `<p style="color:${isError ? 'red' : 'green'}">${message}</p>`
+}
+
+// The original settings editor did not restore field_options when Edit Field
+// was clicked. Preserve the saved options so users can review and update them.
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('.edit-field-button')
+  if (!button) return
+
+  const optionsInput = document.getElementById('customFieldOptions')
+  if (optionsInput) {
+    optionsInput.value = button.dataset.options || ''
+  }
+}, true)
+
+// Prevent empty dropdowns from being created or updated. An empty dropdown is
+// unusable in both the public form and chatbot.
+document.addEventListener('submit', (event) => {
+  const form = event.target
+  if (form?.id !== 'customFieldForm') return
+
+  const type = document.getElementById('customFieldType')?.value
+  if (type !== 'dropdown') return
+
+  const optionsInput = document.getElementById('customFieldOptions')
+  const options = normalizeOptions(optionsInput?.value || '')
+
+  if (!options.length) {
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    showSettingsMessage(
+      'Please enter at least one dropdown option. Add one option per line.',
+      true
+    )
+    optionsInput?.focus()
+  }
+}, true)
+
 let repairTimer
 const scheduleRepair = () => {
   window.clearTimeout(repairTimer)
