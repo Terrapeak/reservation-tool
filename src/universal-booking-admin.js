@@ -363,7 +363,7 @@ async function renderAvailability(business, access) {
             <label>Staff<select id="availabilityStaff">${manageableStaff.map(person => `<option value="${person.id}">${escapeHtml(person.display_name)}</option>`).join('')}</select></label>
             <label>Service restriction<select id="availabilityService"><option value="">All assigned services</option>${services.map(service => `<option value="${service.id}">${escapeHtml(service.name)}</option>`).join('')}</select></label>
             <div class="weekly-grid">
-              ${days.map((day, index) => `<div class="day-row availability-day"><label class="check-label"><input class="day-enabled" data-day="${index}" type="checkbox" ${index > 0 && index < 6 ? 'checked' : ''}>${day}</label><div class="period-inputs"><input class="day-start" data-day="${index}" type="time" value="09:00"><span>to</span><input class="day-end" data-day="${index}" type="time" value="17:00"><label class="split-toggle"><input class="day-split" data-day="${index}" type="checkbox"> Add second period</label><div class="second-period" data-day="${index}" hidden><input class="day-start-two" data-day="${index}" type="time" value="13:00"><span>to</span><input class="day-end-two" data-day="${index}" type="time" value="17:00"></div></div></div>`).join('')}
+              ${days.map((day, index) => `<div class="day-row availability-day"><label class="check-label"><input class="day-enabled" data-day="${index}" type="checkbox" ${index > 0 && index < 6 ? 'checked' : ''}>${day}</label><div class="day-periods" data-day="${index}"><div class="period-row"><input class="period-start" type="time" value="09:00" aria-label="${day} start time"><span>to</span><input class="period-end" type="time" value="17:00" aria-label="${day} end time"><button type="button" class="remove-period" aria-label="Remove time period">Remove</button></div><button type="button" class="add-period" data-day="${index}">+ Add time period</button></div></div>`).join('')}
             </div>
             <button type="submit">Replace weekly schedule</button>
           </form>
@@ -388,9 +388,29 @@ async function renderAvailability(business, access) {
     </div>
   `
 
-  document.querySelectorAll('.day-split').forEach(checkbox => {
-    checkbox.addEventListener('change', () => {
-      document.querySelector(`.second-period[data-day="${checkbox.dataset.day}"]`).hidden = !checkbox.checked
+  function wirePeriodRow(row) {
+    row.querySelector('.remove-period').addEventListener('click', () => {
+      const container = row.closest('.day-periods')
+      if (container.querySelectorAll('.period-row').length === 1) {
+        const checkbox = document.querySelector(`.day-enabled[data-day="${container.dataset.day}"]`)
+        checkbox.checked = false
+        return
+      }
+      row.remove()
+    })
+  }
+
+  document.querySelectorAll('.period-row').forEach(wirePeriodRow)
+  document.querySelectorAll('.add-period').forEach(button => {
+    button.addEventListener('click', () => {
+      const container = document.querySelector(`.day-periods[data-day="${button.dataset.day}"]`)
+      const row = document.createElement('div')
+      row.className = 'period-row'
+      row.innerHTML = '<input class="period-start" type="time" value="09:00" aria-label="Start time"><span>to</span><input class="period-end" type="time" value="17:00" aria-label="End time"><button type="button" class="remove-period" aria-label="Remove time period">Remove</button>'
+      container.insertBefore(row, button)
+      document.querySelector(`.day-enabled[data-day="${button.dataset.day}"]`).checked = true
+      wirePeriodRow(row)
+      row.querySelector('.period-start').focus()
     })
   })
 
@@ -400,30 +420,24 @@ async function renderAvailability(business, access) {
     const serviceValue = document.getElementById('availabilityService').value
     const serviceId = serviceValue ? Number(serviceValue) : null
 
-    let deleteQuery = supabase.from('availability_rules').delete().eq('staff_id', staffId)
-    deleteQuery = serviceId === null ? deleteQuery.is('service_id', null) : deleteQuery.eq('service_id', serviceId)
-    const { error: deleteError } = await deleteQuery
-    if (deleteError) return showMessage(deleteError.message, 'error')
-
     const rules = [...document.querySelectorAll('.day-enabled:checked')].flatMap(checkbox => {
       const day = Number(checkbox.dataset.day)
-      const periods = [{
+      return [...document.querySelectorAll(`.day-periods[data-day="${day}"] .period-row`)].map(row => ({
         business_id: business.id,
         staff_id: staffId,
         service_id: serviceId,
         day_of_week: day,
-        start_time: document.querySelector(`.day-start[data-day="${day}"]`).value,
-        end_time: document.querySelector(`.day-end[data-day="${day}"]`).value
-      }]
-      if (document.querySelector(`.day-split[data-day="${day}"]`).checked) {
-        periods.push({
-          business_id: business.id, staff_id: staffId, service_id: serviceId, day_of_week: day,
-          start_time: document.querySelector(`.day-start-two[data-day="${day}"]`).value,
-          end_time: document.querySelector(`.day-end-two[data-day="${day}"]`).value
-        })
-      }
-      return periods
+        start_time: row.querySelector('.period-start').value,
+        end_time: row.querySelector('.period-end').value
+      }))
     })
+    const invalidRule = rules.find(rule => !rule.start_time || !rule.end_time || rule.end_time <= rule.start_time)
+    if (invalidRule) return showMessage(`${days[invalidRule.day_of_week]} has an end time that is not later than its start time.`, 'error')
+
+    let deleteQuery = supabase.from('availability_rules').delete().eq('staff_id', staffId)
+    deleteQuery = serviceId === null ? deleteQuery.is('service_id', null) : deleteQuery.eq('service_id', serviceId)
+    const { error: deleteError } = await deleteQuery
+    if (deleteError) return showMessage(deleteError.message, 'error')
     if (rules.length) {
       const { error } = await supabase.from('availability_rules').insert(rules)
       if (error) return showMessage(error.message, 'error')
