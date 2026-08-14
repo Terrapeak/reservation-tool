@@ -18,14 +18,19 @@ function frame(content){
 }
 
 function authScreen(){
-  frame('<section class="onboarding-card auth"><p class="step-label">Owner account</p><h1>Set up your booking business</h1><p>Sign in or create an account before creating your business.</p><form id="ownerAuth"><label>Email<input name="email" type="email" required autocomplete="email"></label><label>Password<input name="password" type="password" required minlength="8" autocomplete="current-password"></label><div class="actions"><button name="action" value="signin">Sign in</button><button name="action" value="signup" class="secondary">Create account</button></div><p id="onboardingMessage" role="status"></p></form></section>')
+  frame('<section class="onboarding-card auth"><p class="step-label">Owner account</p><h1>Set up your booking business</h1><p>If this is your first visit, choose <strong>Create new account</strong>. Use sign in only after your account has been created.</p><form id="ownerAuth"><label>Email<input name="email" type="email" required autocomplete="email"></label><label>Password<input name="password" type="password" required minlength="8" autocomplete="current-password"></label><div class="actions"><button type="submit" name="action" value="signup">Create new account</button><button type="submit" name="action" value="signin" class="secondary">Sign in to existing account</button></div><p id="onboardingMessage" role="status" aria-live="polite"></p></form></section>')
   document.querySelector('#ownerAuth').onsubmit=async event=>{
     event.preventDefault()
     const values=new FormData(event.currentTarget), action=event.submitter.value
     const credentials={email:values.get('email').trim(),password:values.get('password')}
     const result=action==='signup'?await supabase.auth.signUp(credentials):await supabase.auth.signInWithPassword(credentials)
     const message=document.querySelector('#onboardingMessage')
-    if(result.error){message.textContent=result.error.message;return}
+    if(result.error){
+      message.textContent=action==='signin'&&result.error.message.toLowerCase().includes('invalid login')
+        ? 'That email and password do not match a staging account. If this is your first visit, choose Create new account.'
+        : result.error.message
+      return
+    }
     if(!result.data.session){message.textContent='Check your email to confirm your account, then return here to sign in.';return}
     setupScreen(result.data.session)
   }
