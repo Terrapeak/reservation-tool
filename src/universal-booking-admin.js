@@ -76,14 +76,13 @@ function renderShell(business, activePage) {
 }
 
 async function loadBusiness() {
-  const { data, error } = await supabase
-    .from('businesses')
-    .select('id, business_name, business_slug, business_type')
-    .eq('business_slug', businessSlug)
-    .single()
+  const { data, error } = await supabase.rpc('get_public_booking_business', {
+    p_business_slug: businessSlug
+  })
 
   if (error) throw error
-  return data
+  if (!data?.[0]) throw new Error('Booking business not found.')
+  return data[0]
 }
 
 async function requireBusinessAccess(business) {
