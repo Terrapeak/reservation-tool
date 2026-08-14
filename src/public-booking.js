@@ -11,7 +11,8 @@ async function start() {
   app().innerHTML = '<main class="booking-shell">Loading booking page…</main>'
   const businessSlug=route[1], si=route.findIndex(x=>x.toLowerCase()==='services'), ti=route.findIndex(x=>x.toLowerCase()==='team')
   const serviceSlug=si<0?null:route[si+1], staffSlug=ti<0?null:route[ti+1]
-  const {data:business}=await supabase.from('businesses').select('id,business_name,business_slug,business_type').ilike('business_slug',businessSlug).maybeSingle()
+  const {data:businessRows}=await supabase.rpc('get_public_booking_business',{p_business_slug:businessSlug})
+  const business=businessRows?.[0]
   if(!business) return fail('Booking page not found.')
   document.title='Book with '+business.business_name
   if(!serviceSlug) return businessPage(business)
