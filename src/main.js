@@ -369,12 +369,34 @@ if (pageRoute === '/') {
 
 <div id="cancelMessage"></div>
 
+<hr>
+<h2>Reschedule ${profile.booking_label}</h2>
+<form id="rescheduleForm">
+  <input id="rescheduleReference" placeholder="${profile.booking_label} Reference" required />
+  <br /><br />
+  <input id="reschedulePhone" placeholder="Phone Number Used for Booking" required />
+  <br /><br />
+  <input id="rescheduleDate" type="date" required />
+  <br /><br />
+  <button id="loadRescheduleSlots" type="button">Show Available Times</button>
+  <select id="rescheduleTime" hidden required></select>
+  <button id="confirmReschedule" type="submit" hidden>Confirm New Time</button>
+</form>
+<div id="rescheduleMessage"></div>
+
 `
 
 const form = document.getElementById('reservationForm')
 const submitButton = form.querySelector('button[type="submit"]')
 const cancelForm = document.getElementById('cancelForm')
 const cancelButton = cancelForm.querySelector('button[type="submit"]')
+const rescheduleForm = document.getElementById('rescheduleForm')
+const loadRescheduleSlots = document.getElementById('loadRescheduleSlots')
+const rescheduleTime = document.getElementById('rescheduleTime')
+const confirmReschedule = document.getElementById('confirmReschedule')
+const rescheduleDate = document.getElementById('rescheduleDate')
+rescheduleDate.min = new Date().toISOString().split('T')[0]
+rescheduleDate.max = new Date(Date.now() + 730 * 86400000).toISOString().split('T')[0]
 
 async function checkAvailability(
   reservation_date,
@@ -659,6 +681,56 @@ cancelForm.addEventListener('submit', async (e) => {
 
   cancelButton.disabled = false
   cancelButton.textContent = 'Cancel Reservation'
+})
+
+loadRescheduleSlots.addEventListener('click', async () => {
+  const reference = document.getElementById('rescheduleReference').value.trim()
+  const phone = document.getElementById('reschedulePhone').value.trim()
+  const message = document.getElementById('rescheduleMessage')
+  if (!reference || !phone || !rescheduleDate.value) {
+    message.innerHTML = '<p style="color:red">Enter your reference, phone number and preferred date.</p>'
+    return
+  }
+  loadRescheduleSlots.disabled = true
+  message.textContent = 'Checking available times...'
+  const { data, error } = await supabase.rpc('get_public_restaurant_reschedule_slots', {
+    p_business_slug: currentBusinessSlug,
+    p_reservation_reference: reference,
+    p_phone: phone,
+    p_local_date: rescheduleDate.value
+  })
+  loadRescheduleSlots.disabled = false
+  if (error || !data?.length) {
+    rescheduleTime.hidden = true
+    confirmReschedule.hidden = true
+    message.innerHTML = '<p style="color:red">No available times found. Check your details or choose another date.</p>'
+    return
+  }
+  rescheduleTime.innerHTML = data.map(row => '<option value="' + row.reservation_time + '">' + row.reservation_time.slice(0, 5) + '</option>').join('')
+  rescheduleTime.hidden = false
+  confirmReschedule.hidden = false
+  message.textContent = 'Choose a new time and confirm.'
+})
+
+rescheduleForm.addEventListener('submit', async (e) => {
+  e.preventDefault()
+  confirmReschedule.disabled = true
+  const { data, error } = await supabase.rpc('reschedule_public_restaurant_reservation', {
+    p_business_slug: currentBusinessSlug,
+    p_reservation_reference: document.getElementById('rescheduleReference').value.trim(),
+    p_phone: document.getElementById('reschedulePhone').value.trim(),
+    p_new_date: rescheduleDate.value,
+    p_new_time: rescheduleTime.value
+  })
+  confirmReschedule.disabled = false
+  const message = document.getElementById('rescheduleMessage')
+  if (error || data !== true) {
+    message.innerHTML = '<p style="color:red">Could not reschedule. The time may have just been taken.</p>'
+    return
+  }
+  message.innerHTML = '<p style="color:green">Your new reservation time is confirmed.</p>'
+  rescheduleTime.hidden = true
+  confirmReschedule.hidden = true
 })
 
 }
