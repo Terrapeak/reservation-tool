@@ -42,7 +42,7 @@ async function servicePage(business,service){
 async function scheduledServicePage(business,service){
   const today=new Date(), max=new Date(); max.setDate(max.getDate()+60)
   const crumb='<a href="/book/'+esc(business.business_slug)+'">Services</a><span>/</span><span>'+esc(service.name)+'</span>'
-  shell(business,'<section class="booking-hero compact"><p class="booking-kicker">Scheduled '+esc(service.booking_type)+'</p><h1>'+esc(service.name)+'</h1><p>'+esc(service.description||'Choose a published session.')+'</p></section><section class="calendar-panel scheduled-calendar"><div><label for="bookingDate">Choose a date</label><input id="bookingDate" type="date" min="'+dateValue(today)+'" max="'+dateValue(max)+'" value="'+dateValue(today)+'"><p class="timezone">Times are shown in each teacher’s timezone.</p></div><div><h2>Available sessions</h2><div id="availableSessions" class="session-grid"></div></div></section><form id="publicBookingForm" class="booking-form" hidden><h2>Your details</h2><p id="selectedTime"></p><div class="form-grid"><label>Name<input name="name" required maxlength="200"></label><label>Email<input name="email" type="email" maxlength="320"></label><label>Phone<input name="phone" maxlength="50"></label></div><label>Number of places<input name="quantity" type="number" min="1" value="1" required></label><label>Notes<textarea name="notes" maxlength="2000"></textarea></label><button type="submit">Confirm booking</button><p id="bookingMessage" role="status"></p></form>',crumb)
+  shell(business,'<section class="booking-hero compact"><p class="booking-kicker">Scheduled '+esc(service.booking_type)+'</p><h1>'+esc(service.name)+'</h1><p>'+esc(service.description||'Choose a published session.')+'</p></section><section class="calendar-panel scheduled-calendar"><div><label for="bookingDate">Choose a date</label><input id="bookingDate" type="date" min="'+dateValue(today)+'" max="'+dateValue(max)+'" value="'+dateValue(today)+'"><p class="timezone">Times are shown in each teacher’s timezone.</p></div><div><h2>Available sessions</h2><div id="availableSessions" class="session-grid"></div></div></section><form id="publicBookingForm" class="booking-form" hidden><h2>Your details</h2><p id="selectedTime"></p><div class="form-grid"><label>Name<input name="name" required maxlength="200"></label><label>Email<input name="email" type="email" maxlength="320"></label><label>Phone<input name="phone" required maxlength="50"></label></div><label>Number of places<input name="quantity" type="number" min="1" value="1" required></label><label>Notes<textarea name="notes" maxlength="2000"></textarea></label><button type="submit">Confirm booking</button><p id="bookingMessage" role="status"></p></form>',crumb)
   const date=document.querySelector('#bookingDate'), target=document.querySelector('#availableSessions'), form=document.querySelector('#publicBookingForm')
   let selected=null
   async function load(){
@@ -73,7 +73,7 @@ function calendarPage(business,service,staff,assignment){
   const today=new Date(), max=new Date(); max.setDate(max.getDate()+60)
   const avatar=staff.photo_url?'<img src="'+esc(staff.photo_url)+'" alt="">':esc(staff.display_name[0])
   const crumb='<a href="/book/'+esc(business.business_slug)+'">Services</a><span>/</span><a href="/book/'+esc(business.business_slug)+'/services/'+esc(service.slug)+'">'+esc(service.name)+'</a><span>/</span><span>'+esc(staff.display_name)+'</span>'
-  shell(business,'<section class="booking-profile"><div class="staff-avatar large">'+avatar+'</div><div><p class="booking-kicker">'+esc(service.name)+'</p><h1>'+esc(staff.display_name)+'</h1><p>'+esc(staff.bio||'')+'</p><span>'+(assignment.custom_duration_minutes||service.duration_minutes)+' min · '+cash(assignment.custom_price??service.price,service.currency)+'</span></div></section><section class="calendar-panel"><div><label for="bookingDate">Choose a date</label><input id="bookingDate" type="date" min="'+dateValue(today)+'" max="'+dateValue(max)+'" value="'+dateValue(today)+'"><p class="timezone">Times shown in '+esc(staff.timezone)+'</p></div><div><h2>Available times</h2><div id="availableSlots" class="slot-grid"></div></div></section><form id="publicBookingForm" class="booking-form" hidden><h2>Your details</h2><p id="selectedTime"></p><div class="form-grid"><label>Name<input name="name" required maxlength="200"></label><label>Email<input name="email" type="email" maxlength="320"></label><label>Phone<input name="phone" maxlength="50"></label></div><label>Notes<textarea name="notes" maxlength="2000"></textarea></label><button type="submit">Confirm booking</button><p id="bookingMessage" role="status"></p></form>',crumb)
+  shell(business,'<section class="booking-profile"><div class="staff-avatar large">'+avatar+'</div><div><p class="booking-kicker">'+esc(service.name)+'</p><h1>'+esc(staff.display_name)+'</h1><p>'+esc(staff.bio||'')+'</p><span>'+(assignment.custom_duration_minutes||service.duration_minutes)+' min · '+cash(assignment.custom_price??service.price,service.currency)+'</span></div></section><section class="calendar-panel"><div><label for="bookingDate">Choose a date</label><input id="bookingDate" type="date" min="'+dateValue(today)+'" max="'+dateValue(max)+'" value="'+dateValue(today)+'"><p class="timezone">Times shown in '+esc(staff.timezone)+'</p></div><div><h2>Available times</h2><div id="availableSlots" class="slot-grid"></div></div></section><form id="publicBookingForm" class="booking-form" hidden><h2>Your details</h2><p id="selectedTime"></p><div class="form-grid"><label>Name<input name="name" required maxlength="200"></label><label>Email<input name="email" type="email" maxlength="320"></label><label>Phone<input name="phone" required maxlength="50"></label></div><label>Notes<textarea name="notes" maxlength="2000"></textarea></label><button type="submit">Confirm booking</button><p id="bookingMessage" role="status"></p></form>',crumb)
   const date=document.querySelector('#bookingDate'), slots=document.querySelector('#availableSlots'), form=document.querySelector('#publicBookingForm')
   let selected=null
   async function load(){
@@ -95,6 +95,61 @@ function calendarPage(business,service,staff,assignment){
   }
   load()
 }
+
+function bookingManagerMarkup(){
+  return '<details class="booking-manager"><summary>Manage an existing booking</summary><form id="bookingManagerLookup" class="manager-lookup"><p>Enter the booking reference and the same phone number used when booking.</p><div class="form-grid"><label>Booking reference<input name="reference" required maxlength="80"></label><label>Phone<input name="phone" required maxlength="50"></label></div><button type="submit">Find booking</button><p class="manager-message" role="status"></p></form><div id="bookingManagerResult"></div></details>'
+}
+
+function setupBookingManager(business){
+  const form=document.querySelector('#bookingManagerLookup')
+  if(!form)return
+  const result=document.querySelector('#bookingManagerResult'), message=form.querySelector('.manager-message')
+  let credentials=null, booking=null
+  form.onsubmit=async event=>{
+    event.preventDefault();const values=new FormData(form)
+    credentials={reference:String(values.get('reference')).trim(),phone:String(values.get('phone')).trim()}
+    message.textContent='Looking up booking…';result.innerHTML=''
+    const {data,error}=await supabase.rpc('get_public_booking_for_management',{p_business_slug:business.business_slug,p_reference:credentials.reference,p_phone:credentials.phone})
+    booking=data?.[0]
+    if(error||!booking){message.textContent='Booking not found. Check the reference and phone number.';return}
+    message.textContent=''
+    renderManager()
+  }
+  function renderManager(){
+    const zone=booking.staff_timezone||'UTC'
+    const when=new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short',timeZone:zone}).format(new Date(booking.starts_at))
+    result.innerHTML='<div class="manager-current"><p class="booking-kicker">Current booking</p><h3>'+esc(booking.service_name)+'</h3><p>'+esc(when)+' · '+esc(booking.staff_name||'Assigned team member')+'</p><p>Status: '+esc(booking.status)+'</p><div class="manager-actions"><button type="button" id="showReschedule">Reschedule</button><button type="button" class="danger" id="cancelManagedBooking">Cancel booking</button></div><div id="managerOptions"></div><p class="manager-message" id="managerActionMessage" role="status"></p></div>'
+    document.querySelector('#showReschedule').onclick=showOptions
+    document.querySelector('#cancelManagedBooking').onclick=cancelBooking
+  }
+  async function showOptions(){
+    const options=document.querySelector('#managerOptions'), today=new Date(), max=new Date();max.setDate(max.getDate()+31)
+    options.innerHTML='<label>Choose a date<input id="managerDate" type="date" min="'+dateValue(today)+'" max="'+dateValue(max)+'" value="'+dateValue(today)+'"></label><div id="managerSlots" class="slot-grid"><p>Checking availability…</p></div>'
+    const date=document.querySelector('#managerDate');date.onchange=loadOptions;loadOptions()
+  }
+  async function loadOptions(){
+    const date=document.querySelector('#managerDate'), slots=document.querySelector('#managerSlots')
+    slots.innerHTML='<p>Checking availability…</p>'
+    const {data,error}=await supabase.rpc('get_public_booking_reschedule_options',{p_business_slug:business.business_slug,p_reference:credentials.reference,p_phone:credentials.phone,p_from_date:date.value,p_to_date:date.value})
+    if(error){slots.innerHTML='<p>Availability could not be loaded.</p>';return}
+    slots.innerHTML=data?.length?data.map(x=>{const zone=x.staff_timezone||booking.staff_timezone||'UTC';const label=new Intl.DateTimeFormat(undefined,{hour:'numeric',minute:'2-digit',timeZone:zone}).format(new Date(x.starts_at));return '<button type="button" class="slot manager-slot" data-start="'+x.starts_at+'" data-session="'+(x.session_id||'')+'">'+esc(label)+'<small>'+esc(x.staff_name||'')+'</small></button>'}).join(''):'<p>No alternatives are available on this date.</p>'
+    slots.querySelectorAll('.manager-slot').forEach(button=>button.onclick=()=>reschedule(button))
+  }
+  async function reschedule(button){
+    const status=document.querySelector('#managerActionMessage');status.textContent='Rescheduling…'
+    const {error}=await supabase.rpc('reschedule_public_booking',{p_business_slug:business.business_slug,p_reference:credentials.reference,p_phone:credentials.phone,p_new_starts_at:button.dataset.session?null:button.dataset.start,p_new_session_id:button.dataset.session?Number(button.dataset.session):null})
+    if(error){status.textContent=error.message.includes('available')||error.message.includes('places')?'That option was just taken. Please choose another.':'Booking could not be rescheduled.';return}
+    status.textContent='Booking rescheduled successfully.';form.requestSubmit()
+  }
+  async function cancelBooking(){
+    if(!confirm('Cancel this booking?'))return
+    const status=document.querySelector('#managerActionMessage');status.textContent='Cancelling…'
+    const {data,error}=await supabase.rpc('cancel_public_booking',{p_business_slug:business.business_slug,p_reference:credentials.reference,p_phone:credentials.phone})
+    if(error||!data){status.textContent='Booking could not be cancelled.';return}
+    result.innerHTML='<div class="booking-success"><h3>Booking cancelled</h3><p>Your booking has been cancelled.</p></div>'
+  }
+}
+
 function dateValue(date){const o=date.getTimezoneOffset();return new Date(date.getTime()-o*60000).toISOString().slice(0,10)}
 function fail(message){app().innerHTML='<main class="booking-shell booking-error"><h1>'+esc(message)+'</h1><p>Check the link or contact the business.</p></main>'}
 
