@@ -28,7 +28,8 @@ async function start() {
 }
 
 function shell(business,content,crumb=''){
-  app().innerHTML='<main class="booking-shell"><header class="booking-header"><a class="booking-brand" href="/book/'+esc(business.business_slug)+'">'+esc(business.business_name)+'</a><span>Online booking</span></header>'+(crumb?'<nav class="booking-crumb">'+crumb+'</nav>':'')+content+'</main>'
+  app().innerHTML='<main class="booking-shell"><header class="booking-header"><a class="booking-brand" href="/book/'+esc(business.business_slug)+'">'+esc(business.business_name)+'</a><span>Online booking</span></header>'+(crumb?'<nav class="booking-crumb">'+crumb+'</nav>':'')+content+bookingManagerMarkup()+'</main>'
+  setupBookingManager(business)
 }
 async function businessPage(business){
   const {data:services=[]}=await supabase.from('services').select('*').eq('business_id',business.id).eq('is_active',true).eq('is_published',true).order('name')
