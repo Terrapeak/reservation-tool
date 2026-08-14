@@ -196,11 +196,32 @@ function setSettingsTabColors() {
   })
 }
 
+async function addUniversalBookingNavigation() {
+  const nav = await waitForElement('.admin-nav')
+  if (!nav || nav.querySelector('[data-universal-booking-link]')) return
+
+  const businessSlug = window.location.pathname.split('/').filter(Boolean)[0]
+  const links = [
+    ['Services', 'services'],
+    ['Staff', 'staff'],
+    ['Availability', 'availability']
+  ]
+
+  links.forEach(([label, page]) => {
+    const link = document.createElement('a')
+    link.dataset.universalBookingLink = page
+    link.href = `/${businessSlug}/dashboard/${page}`
+    link.textContent = label
+    nav.appendChild(link)
+  })
+}
+
 function startEnhancements() {
   updateDocumentTitle()
   updateDashboardHeading()
   enhanceDashboardPage()
   enhanceAnalyticsPage()
+  addUniversalBookingNavigation()
   waitForElement('#businessSettingsSection').then(setSettingsTabColors)
 }
 
