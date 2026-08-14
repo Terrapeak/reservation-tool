@@ -343,7 +343,7 @@ async function renderStaff(business, access) {
 
 async function renderAvailability(business, access) {
   const [{ data: staff, error: staffError }, { data: services, error: servicesError }] = await Promise.all([
-    supabase.from('staff_members').select('id, display_name, user_id').eq('business_id', business.id).eq('is_active', true).order('display_name'),
+    supabase.from('staff_members').select('id, display_name, user_id, timezone').eq('business_id', business.id).eq('is_active', true).order('display_name'),
     supabase.from('services').select('id, name').eq('business_id', business.id).eq('is_active', true).order('name')
   ])
   if (staffError) throw staffError
@@ -363,7 +363,7 @@ async function renderAvailability(business, access) {
             <label>Staff<select id="availabilityStaff">${manageableStaff.map(person => `<option value="${person.id}">${escapeHtml(person.display_name)}</option>`).join('')}</select></label>
             <label>Service restriction<select id="availabilityService"><option value="">All assigned services</option>${services.map(service => `<option value="${service.id}">${escapeHtml(service.name)}</option>`).join('')}</select></label>
             <div class="weekly-grid">
-              ${days.map((day, index) => `<div class="day-row"><label class="check-label"><input class="day-enabled" data-day="${index}" type="checkbox" ${index > 0 && index < 6 ? 'checked' : ''}>${day}</label><input class="day-start" data-day="${index}" type="time" value="09:00"><span>to</span><input class="day-end" data-day="${index}" type="time" value="17:00"></div>`).join('')}
+              ${days.map((day, index) => `<div class="day-row availability-day"><label class="check-label"><input class="day-enabled" data-day="${index}" type="checkbox" ${index > 0 && index < 6 ? 'checked' : ''}>${day}</label><div class="period-inputs"><input class="day-start" data-day="${index}" type="time" value="09:00"><span>to</span><input class="day-end" data-day="${index}" type="time" value="17:00"><label class="split-toggle"><input class="day-split" data-day="${index}" type="checkbox"> Add second period</label><div class="second-period" data-day="${index}" hidden><input class="day-start-two" data-day="${index}" type="time" value="13:00"><span>to</span><input class="day-end-two" data-day="${index}" type="time" value="17:00"></div></div></div>`).join('')}
             </div>
             <button type="submit">Replace weekly schedule</button>
           </form>
@@ -375,16 +375,24 @@ async function renderAvailability(business, access) {
         ${manageableStaff.length ? `
           <form id="exceptionForm" class="stacked-form">
             <label>Staff<select id="exceptionStaff">${manageableStaff.map(person => `<option value="${person.id}">${escapeHtml(person.display_name)}</option>`).join('')}</select></label>
+            <label>Service restriction<select id="exceptionService"><option value="">All assigned services</option>${services.map(service => `<option value="${service.id}">${escapeHtml(service.name)}</option>`).join('')}</select></label>
             <label>Type<select id="exceptionType"><option value="unavailable">Unavailable / day off</option><option value="available">Additional availability</option></select></label>
             <label>Starts<input id="exceptionStart" type="datetime-local" required></label>
             <label>Ends<input id="exceptionEnd" type="datetime-local" required></label>
             <label>Reason<input id="exceptionReason" placeholder="Annual leave"></label>
             <button type="submit">Add exception</button>
           </form>
+          <div id="exceptionList" class="calendar-summary"></div>
         ` : ''}
       </section>
     </div>
   `
+
+  document.querySelectorAll('.day-split').forEach(checkbox => {
+    checkbox.addEventListener('change', () => {
+      document.querySelector(`.second-period[data-day="${checkbox.dataset.day}"]`).hidden = !checkbox.checked
+    })
+  })
 
   document.getElementById('availabilityForm')?.addEventListener('submit', async (event) => {
     event.preventDefault()
@@ -397,16 +405,24 @@ async function renderAvailability(business, access) {
     const { error: deleteError } = await deleteQuery
     if (deleteError) return showMessage(deleteError.message, 'error')
 
-    const rules = [...document.querySelectorAll('.day-enabled:checked')].map(checkbox => {
+    const rules = [...document.querySelectorAll('.day-enabled:checked')].flatMap(checkbox => {
       const day = Number(checkbox.dataset.day)
-      return {
+      const periods = [{
         business_id: business.id,
         staff_id: staffId,
         service_id: serviceId,
         day_of_week: day,
         start_time: document.querySelector(`.day-start[data-day="${day}"]`).value,
         end_time: document.querySelector(`.day-end[data-day="${day}"]`).value
+      }]
+      if (document.querySelector(`.day-split[data-day="${day}"]`).checked) {
+        periods.push({
+          business_id: business.id, staff_id: staffId, service_id: serviceId, day_of_week: day,
+          start_time: document.querySelector(`.day-start-two[data-day="${day}"]`).value,
+          end_time: document.querySelector(`.day-end-two[data-day="${day}"]`).value
+        })
       }
+      return periods
     })
     if (rules.length) {
       const { error } = await supabase.from('availability_rules').insert(rules)
@@ -420,6 +436,7 @@ async function renderAvailability(business, access) {
     const { error } = await supabase.from('availability_exceptions').insert({
       business_id: business.id,
       staff_id: Number(document.getElementById('exceptionStaff').value),
+      service_id: document.getElementById('exceptionService').value ? Number(document.getElementById('exceptionService').value) : null,
       exception_type: document.getElementById('exceptionType').value,
       starts_at: new Date(document.getElementById('exceptionStart').value).toISOString(),
       ends_at: new Date(document.getElementById('exceptionEnd').value).toISOString(),
@@ -428,5 +445,29 @@ async function renderAvailability(business, access) {
     if (error) return showMessage(error.message, 'error')
     event.currentTarget.reset()
     showMessage('Calendar exception added.')
+    await loadExceptions()
   })
+
+  async function loadExceptions() {
+    const staffId = Number(document.getElementById('exceptionStaff')?.value)
+    if (!staffId) return
+    const { data: exceptions, error } = await supabase.from('availability_exceptions')
+      .select('id, service_id, starts_at, ends_at, exception_type, reason')
+      .eq('staff_id', staffId).gte('ends_at', new Date().toISOString()).order('starts_at').limit(30)
+    if (error) return showMessage(error.message, 'error')
+    const target = document.getElementById('exceptionList')
+    target.innerHTML = '<h3>Upcoming exceptions</h3>' + (exceptions.length ? exceptions.map(item => {
+      const service = services.find(entry => entry.id === item.service_id)
+      return `<div class="calendar-item"><div><strong>${item.exception_type === 'unavailable' ? 'Time off' : 'Special hours'}</strong><span>${new Date(item.starts_at).toLocaleString()} – ${new Date(item.ends_at).toLocaleString()}</span><small>${escapeHtml(service?.name || 'All services')}${item.reason ? ' · ' + escapeHtml(item.reason) : ''}</small></div><button type="button" class="danger-text remove-exception" data-id="${item.id}">Remove</button></div>`
+    }).join('') : '<p>No upcoming exceptions.</p>')
+    target.querySelectorAll('.remove-exception').forEach(button => button.addEventListener('click', async () => {
+      const { error: deleteError } = await supabase.from('availability_exceptions').delete().eq('id', Number(button.dataset.id))
+      if (deleteError) return showMessage(deleteError.message, 'error')
+      showMessage('Calendar exception removed.')
+      await loadExceptions()
+    }))
+  }
+
+  document.getElementById('exceptionStaff')?.addEventListener('change', loadExceptions)
+  await loadExceptions()
 }
