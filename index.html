@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="/src/admin-ui.css" />
     <link rel="stylesheet" href="/src/universal-booking-admin.css" />
     <link rel="stylesheet" href="/src/public-booking.css" />
+    <link rel="stylesheet" href="/src/owner-onboarding.css" />
     <link rel="stylesheet" href="/src/public-ui.css" />
     <link rel="stylesheet" href="/src/customer-view.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -25,7 +26,9 @@
     </script>
     <div id="app"></div>
     <script type="module">
-      if (window.location.pathname.startsWith('/book/')) {
+      if (window.location.pathname === '/onboarding' || window.location.pathname === '/onboarding/') {
+        await import('/src/owner-onboarding.js')
+      } else if (window.location.pathname.startsWith('/book/')) {
         await import('/src/public-booking.js')
       } else {
         await import('/src/customer-auth-bootstrap.js')
