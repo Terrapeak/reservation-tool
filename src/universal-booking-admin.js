@@ -8,6 +8,8 @@ const supportedRoutes = new Set([
   'dashboard/services',
   'admin/staff',
   'dashboard/staff',
+  'admin/schedule',
+  'dashboard/schedule',
   'admin/availability',
   'dashboard/availability'
 ])
@@ -63,6 +65,7 @@ function renderShell(business, activePage) {
       <nav class="universal-nav" aria-label="Universal booking settings">
         <a class="${activePage === 'services' ? 'active' : ''}" href="${base}/services">Services</a>
         <a class="${activePage === 'staff' ? 'active' : ''}" href="${base}/staff">Staff</a>
+        <a class="${activePage === 'schedule' ? 'active' : ''}" href="${base}/schedule">Schedule</a>
         <a class="${activePage === 'availability' ? 'active' : ''}" href="${base}/availability">Availability</a>
       </nav>
 
@@ -157,6 +160,7 @@ async function startUniversalBookingAdmin() {
 
     if (activePage === 'services') await renderServices(business, access)
     if (activePage === 'staff') await renderStaff(business, access)
+    if (activePage === 'schedule') await renderSchedule(business, access)
     if (activePage === 'availability') await renderAvailability(business, access)
   } catch (error) {
     console.error(error)
@@ -190,6 +194,7 @@ async function renderServices(business, access) {
               <div>
                 <h3>${escapeHtml(service.name)}</h3>
                 <p>${escapeHtml(service.booking_type)} · ${service.duration_minutes} minutes · ${money(service.price, service.currency)}</p>
+                <small>${service.scheduling_mode === 'scheduled' ? 'Owner-scheduled sessions' : 'Generated from staff availability'}</small>
               </div>
               <span class="status ${service.is_published ? 'published' : ''}">${service.is_published ? 'Published' : 'Draft'}</span>
             </article>
@@ -208,6 +213,7 @@ async function renderServices(business, access) {
               <label>Type<select id="serviceType"><option value="appointment">Appointment</option><option value="class">Class</option><option value="course">Course</option><option value="restaurant">Restaurant</option></select></label>
               <label>Duration<input id="serviceDuration" type="number" min="5" value="60" required></label>
             </div>
+            <label>Scheduling method<select id="serviceSchedulingMode"><option value="generated">Generate appointments from staff availability</option><option value="scheduled">Use owner-scheduled classes or sessions</option></select></label>
             <div class="form-row">
               <label>Slot interval<input id="slotInterval" type="number" min="5" value="30" required></label>
               <label>Capacity<input id="serviceCapacity" type="number" min="1" value="1" required></label>
@@ -233,6 +239,7 @@ async function renderServices(business, access) {
       slug: toSlug(name),
       description: document.getElementById('serviceDescription').value.trim() || null,
       booking_type: document.getElementById('serviceType').value,
+      scheduling_mode: document.getElementById('serviceSchedulingMode').value,
       duration_minutes: Number(document.getElementById('serviceDuration').value),
       slot_interval_minutes: Number(document.getElementById('slotInterval').value),
       capacity: Number(document.getElementById('serviceCapacity').value),
@@ -245,6 +252,109 @@ async function renderServices(business, access) {
     showMessage(`${name} was created.`)
     await renderServices(business, access)
   })
+}
+
+async function renderSchedule(business, access) {
+  const canManage = ['owner', 'manager'].includes(access.role)
+  const [{ data: services, error: servicesError }, { data: staff, error: staffError }, { data: assignments, error: assignmentsError }] = await Promise.all([
+    supabase.from('services').select('id, name, duration_minutes, capacity, scheduling_mode').eq('business_id', business.id).eq('is_active', true).eq('scheduling_mode', 'scheduled').order('name'),
+    supabase.from('staff_members').select('id, display_name, user_id, timezone').eq('business_id', business.id).eq('is_active', true).order('display_name'),
+    supabase.from('staff_services').select('staff_id, service_id').eq('is_active', true)
+  ])
+  if (servicesError) throw servicesError
+  if (staffError) throw staffError
+  if (assignmentsError) throw assignmentsError
+
+  const visibleStaffIds = canManage ? null : new Set(staff.filter(person => person.user_id === access.session.user.id).map(person => person.id))
+  let sessionQuery = supabase.from('scheduled_sessions')
+    .select('id, service_id, staff_id, starts_at, ends_at, capacity, status, is_published, notes')
+    .eq('business_id', business.id).gte('ends_at', new Date().toISOString()).order('starts_at').limit(100)
+  if (!canManage && visibleStaffIds?.size === 1) sessionQuery = sessionQuery.eq('staff_id', [...visibleStaffIds][0])
+  const { data: sessions, error: sessionsError } = await sessionQuery
+  if (sessionsError) throw sessionsError
+
+  const serviceMap = Object.fromEntries(services.map(service => [service.id, service]))
+  const staffMap = Object.fromEntries(staff.map(person => [person.id, person]))
+  const scheduled = sessions.filter(session => session.status === 'scheduled')
+
+  document.getElementById('universalBookingContent').innerHTML = `
+    <div class="schedule-layout">
+      <section class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">Owner calendar</p><h2>Upcoming sessions</h2></div><span>${scheduled.length}</span></div>
+        <div class="calendar-summary">
+          ${scheduled.length ? scheduled.map(session => `
+            <article class="calendar-item session-item">
+              <div>
+                <strong>${escapeHtml(serviceMap[session.service_id]?.name || 'Session')}</strong>
+                <span>${new Date(session.starts_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })} – ${new Date(session.ends_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+                <small>${escapeHtml(staffMap[session.staff_id]?.display_name || 'Unassigned')} · Capacity ${session.capacity} · ${session.is_published ? 'Published' : 'Draft'}</small>
+              </div>
+              ${canManage ? `<button type="button" class="danger-text cancel-session" data-id="${session.id}">Cancel</button>` : ''}
+            </article>
+          `).join('') : '<p>No upcoming sessions have been scheduled.</p>'}
+        </div>
+      </section>
+
+      <section class="panel">
+        <p class="eyebrow">New calendar entry</p><h2>Schedule a session</h2>
+        ${canManage && services.length && staff.length ? `
+          <form id="sessionForm" class="stacked-form">
+            <label>Service<select id="sessionService">${services.map(service => `<option value="${service.id}">${escapeHtml(service.name)}</option>`).join('')}</select></label>
+            <label>Teacher or staff member<select id="sessionStaff"></select></label>
+            <div class="form-row"><label>Date<input id="sessionDate" type="date" required></label><label>Start time<input id="sessionTime" type="time" required></label></div>
+            <div class="form-row"><label>Duration in minutes<input id="sessionDuration" type="number" min="5" required></label><label>Capacity<input id="sessionCapacity" type="number" min="1" required></label></div>
+            <label>Repeat<select id="sessionRepeat"><option value="1">This date only</option><option value="4">Weekly for 4 weeks</option><option value="8">Weekly for 8 weeks</option><option value="12">Weekly for 12 weeks</option></select></label>
+            <label>Internal or customer note<input id="sessionNotes" maxlength="1000" placeholder="Bring workbook 2"></label>
+            <label class="check-label"><input id="sessionPublished" type="checkbox" checked> Publish for customer booking</label>
+            <button type="submit">Add to calendar</button>
+          </form>
+        ` : canManage ? '<p>Create a scheduled service and assign at least one staff member before adding sessions.</p>' : '<p>Your calendar is read-only. Owners and managers create the schedule.</p>'}
+      </section>
+    </div>
+  `
+
+  const serviceSelect = document.getElementById('sessionService')
+  function refreshSessionForm() {
+    if (!serviceSelect) return
+    const serviceId = Number(serviceSelect.value)
+    const service = serviceMap[serviceId]
+    const eligibleIds = new Set(assignments.filter(item => item.service_id === serviceId).map(item => item.staff_id))
+    const staffSelect = document.getElementById('sessionStaff')
+    staffSelect.innerHTML = staff.filter(person => eligibleIds.has(person.id)).map(person => `<option value="${person.id}">${escapeHtml(person.display_name)} (${escapeHtml(person.timezone)})</option>`).join('')
+    document.getElementById('sessionDuration').value = service?.duration_minutes || 60
+    document.getElementById('sessionCapacity').value = service?.capacity || 1
+  }
+  serviceSelect?.addEventListener('change', refreshSessionForm)
+  refreshSessionForm()
+
+  document.getElementById('sessionForm')?.addEventListener('submit', async event => {
+    event.preventDefault()
+    if (!document.getElementById('sessionStaff').value) return showMessage('Assign a staff member to this service first.', 'error')
+    const button = event.currentTarget.querySelector('button[type="submit"]')
+    button.disabled = true
+    const { data, error } = await supabase.rpc('create_scheduled_sessions', {
+      p_business_id: business.id,
+      p_service_id: Number(serviceSelect.value),
+      p_staff_id: Number(document.getElementById('sessionStaff').value),
+      p_local_starts_at: `${document.getElementById('sessionDate').value}T${document.getElementById('sessionTime').value}:00`,
+      p_duration_minutes: Number(document.getElementById('sessionDuration').value),
+      p_capacity: Number(document.getElementById('sessionCapacity').value),
+      p_repeat_weeks: Number(document.getElementById('sessionRepeat').value),
+      p_is_published: document.getElementById('sessionPublished').checked,
+      p_notes: document.getElementById('sessionNotes').value.trim() || null
+    })
+    button.disabled = false
+    if (error) return showMessage(error.message, 'error')
+    showMessage(`${data?.[0]?.sessions_created || 1} session${data?.[0]?.sessions_created === 1 ? '' : 's'} added to the calendar.`)
+    await renderSchedule(business, access)
+  })
+
+  document.querySelectorAll('.cancel-session').forEach(button => button.addEventListener('click', async () => {
+    const { error } = await supabase.rpc('cancel_scheduled_session', { p_session_id: Number(button.dataset.id) })
+    if (error) return showMessage(error.message, 'error')
+    showMessage('Session cancelled.')
+    await renderSchedule(business, access)
+  }))
 }
 
 async function renderStaff(business, access) {
