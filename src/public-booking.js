@@ -1,7 +1,6 @@
 import { supabase } from './supabaseclient.js'
 
 const route = location.pathname.split('/').filter(Boolean)
-if (route[0]?.toLowerCase() === 'book' && route[1]) start()
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))
 const cash = (value, currency) => value == null ? '' : new Intl.NumberFormat(undefined,{style:'currency',currency:currency||'MYR'}).format(Number(value))
@@ -97,3 +96,5 @@ function calendarPage(business,service,staff,assignment){
 }
 function dateValue(date){const o=date.getTimezoneOffset();return new Date(date.getTime()-o*60000).toISOString().slice(0,10)}
 function fail(message){app().innerHTML='<main class="booking-shell booking-error"><h1>'+esc(message)+'</h1><p>Check the link or contact the business.</p></main>'}
+
+if (route[0]?.toLowerCase() === 'book' && route[1]) start()
