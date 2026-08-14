@@ -24,13 +24,18 @@
       }
     </script>
     <div id="app"></div>
-    <script type="module" src="/src/customer-auth-bootstrap.js"></script>
-    <script type="module" src="/src/admin-enhancements.js"></script>
-    <script type="module" src="/src/universal-booking-admin.js"></script>
-    <script type="module" src="/src/public-booking.js"></script>
-    <script type="module" src="/src/customer-tenant-lock.js"></script>
-    <script type="module" src="/src/business-name-unification.js"></script>
-    <script type="module" src="/src/custom-field-option-repair.js"></script>
+    <script type="module">
+      if (window.location.pathname.startsWith('/book/')) {
+        await import('/src/public-booking.js')
+      } else {
+        await import('/src/customer-auth-bootstrap.js')
+        await import('/src/admin-enhancements.js')
+        await import('/src/universal-booking-admin.js')
+        await import('/src/customer-tenant-lock.js')
+        await import('/src/business-name-unification.js')
+        await import('/src/custom-field-option-repair.js')
+      }
+    </script>
     <script type="module">
       if (window.location.pathname.includes('/admin')) {
         const publicPath = window.location.pathname.replace('/admin', '/dashboard')
