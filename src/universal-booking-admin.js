@@ -43,6 +43,16 @@ function money(value, currency = 'MYR') {
   }).format(Number(value))
 }
 
+function dateTimeInZone(value, timezone) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  }).formatToParts(new Date(value))
+  const part = type => parts.find(item => item.type === type)?.value
+  return { date: `${part('year')}-${part('month')}-${part('day')}`, time: `${part('hour')}:${part('minute')}` }
+}
+
 function showMessage(message, type = 'success') {
   const element = document.getElementById('universalBookingMessage')
   if (!element) return
@@ -272,9 +282,24 @@ async function renderSchedule(business, access) {
   const { data: sessions, error: sessionsError } = await sessionQuery
   if (sessionsError) throw sessionsError
 
+  let registrations = []
+  if (canManage && sessions.length) {
+    const { data, error } = await supabase.from('bookings')
+      .select('id, scheduled_session_id, customer_name, customer_email, customer_phone, quantity, status, reference, notes, created_at')
+      .in('scheduled_session_id', sessions.map(session => session.id))
+      .order('created_at')
+    if (error) throw error
+    registrations = data
+  }
+
   const serviceMap = Object.fromEntries(services.map(service => [service.id, service]))
   const staffMap = Object.fromEntries(staff.map(person => [person.id, person]))
   const scheduled = sessions.filter(session => session.status === 'scheduled')
+  const registrationsBySession = registrations.reduce((grouped, booking) => {
+    grouped[booking.scheduled_session_id] ||= []
+    grouped[booking.scheduled_session_id].push(booking)
+    return grouped
+  }, {})
 
   document.getElementById('universalBookingContent').innerHTML = `
     <div class="schedule-layout">
@@ -288,10 +313,11 @@ async function renderSchedule(business, access) {
                 <span>${new Date(session.starts_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })} – ${new Date(session.ends_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
                 <small>${escapeHtml(staffMap[session.staff_id]?.display_name || 'Unassigned')} · Capacity ${session.capacity} · ${session.is_published ? 'Published' : 'Draft'}</small>
               </div>
-              ${canManage ? `<button type="button" class="danger-text cancel-session" data-id="${session.id}">Cancel</button>` : ''}
+              ${canManage ? `<div class="session-actions"><button type="button" class="secondary-button view-session" data-id="${session.id}">View / edit</button><button type="button" class="secondary-button copy-session" data-id="${session.id}">Copy</button><button type="button" class="danger-text cancel-session" data-id="${session.id}">Cancel</button></div>` : ''}
             </article>
           `).join('') : '<p>No upcoming sessions have been scheduled.</p>'}
         </div>
+        ${canManage ? '<div id="sessionDetails"></div>' : ''}
       </section>
 
       <section class="panel">
@@ -326,6 +352,78 @@ async function renderSchedule(business, access) {
   serviceSelect?.addEventListener('change', refreshSessionForm)
   refreshSessionForm()
 
+  function populateCreateForm(session) {
+    const person = staffMap[session.staff_id]
+    const local = dateTimeInZone(session.starts_at, person?.timezone || 'UTC')
+    serviceSelect.value = session.service_id
+    refreshSessionForm()
+    document.getElementById('sessionStaff').value = session.staff_id
+    document.getElementById('sessionDate').value = local.date
+    document.getElementById('sessionTime').value = local.time
+    document.getElementById('sessionDuration').value = Math.round((new Date(session.ends_at) - new Date(session.starts_at)) / 60000)
+    document.getElementById('sessionCapacity').value = session.capacity
+    document.getElementById('sessionRepeat').value = '1'
+    document.getElementById('sessionNotes').value = session.notes || ''
+    document.getElementById('sessionPublished').checked = session.is_published
+  }
+
+  function renderSessionDetails(session) {
+    const target = document.getElementById('sessionDetails')
+    const service = serviceMap[session.service_id]
+    const person = staffMap[session.staff_id]
+    const local = dateTimeInZone(session.starts_at, person?.timezone || 'UTC')
+    const sessionRegistrations = registrationsBySession[session.id] || []
+    const activePlaces = sessionRegistrations.filter(item => ['pending', 'confirmed'].includes(item.status)).reduce((sum, item) => sum + item.quantity, 0)
+    const eligibleIds = new Set(assignments.filter(item => item.service_id === session.service_id).map(item => item.staff_id))
+    target.innerHTML = `
+      <section class="session-detail">
+        <div class="panel-heading"><div><p class="eyebrow">Session details</p><h3>${escapeHtml(service?.name || 'Session')}</h3></div><button type="button" class="secondary-button" id="closeSessionDetails">Close</button></div>
+        <form id="editSessionForm" class="stacked-form">
+          <label>Teacher or staff member<select id="editSessionStaff">${staff.filter(item => eligibleIds.has(item.id)).map(item => `<option value="${item.id}" ${item.id === session.staff_id ? 'selected' : ''}>${escapeHtml(item.display_name)} (${escapeHtml(item.timezone)})</option>`).join('')}</select></label>
+          <div class="form-row"><label>Date<input id="editSessionDate" type="date" value="${local.date}" required></label><label>Start time<input id="editSessionTime" type="time" value="${local.time}" required></label></div>
+          <div class="form-row"><label>Duration in minutes<input id="editSessionDuration" type="number" min="5" value="${Math.round((new Date(session.ends_at) - new Date(session.starts_at)) / 60000)}" required></label><label>Capacity<input id="editSessionCapacity" type="number" min="${activePlaces || 1}" value="${session.capacity}" required><small>${activePlaces} currently reserved</small></label></div>
+          <label>Internal or customer note<input id="editSessionNotes" maxlength="1000" value="${escapeHtml(session.notes || '')}"></label>
+          <label class="check-label"><input id="editSessionPublished" type="checkbox" ${session.is_published ? 'checked' : ''}> Published for customer booking</label>
+          <button type="submit">Save session changes</button>
+        </form>
+        <div class="registration-list">
+          <h3>Registrations (${activePlaces}/${session.capacity})</h3>
+          ${sessionRegistrations.length ? sessionRegistrations.map(booking => `
+            <article class="registration-item">
+              <div><strong>${escapeHtml(booking.customer_name)}</strong><span>${escapeHtml(booking.reference)} · ${booking.quantity} place${booking.quantity === 1 ? '' : 's'} · ${escapeHtml(booking.status)}</span><small>${escapeHtml(booking.customer_email || booking.customer_phone || 'No contact details')}</small></div>
+              ${['pending', 'confirmed'].includes(booking.status) ? `<button type="button" class="danger-text cancel-registration" data-id="${booking.id}">Cancel registration</button>` : ''}
+            </article>`).join('') : '<p>No registrations yet.</p>'}
+        </div>
+      </section>`
+
+    document.getElementById('closeSessionDetails').addEventListener('click', () => { target.innerHTML = '' })
+    document.getElementById('editSessionForm').addEventListener('submit', async event => {
+      event.preventDefault()
+      const button = event.currentTarget.querySelector('button[type="submit"]')
+      button.disabled = true
+      const { error } = await supabase.rpc('update_scheduled_session', {
+        p_session_id: session.id,
+        p_staff_id: Number(document.getElementById('editSessionStaff').value),
+        p_local_starts_at: `${document.getElementById('editSessionDate').value}T${document.getElementById('editSessionTime').value}:00`,
+        p_duration_minutes: Number(document.getElementById('editSessionDuration').value),
+        p_capacity: Number(document.getElementById('editSessionCapacity').value),
+        p_is_published: document.getElementById('editSessionPublished').checked,
+        p_notes: document.getElementById('editSessionNotes').value.trim() || null
+      })
+      button.disabled = false
+      if (error) return showMessage(error.message, 'error')
+      showMessage('Session changes saved.')
+      await renderSchedule(business, access)
+    })
+    target.querySelectorAll('.cancel-registration').forEach(button => button.addEventListener('click', async () => {
+      const { error } = await supabase.rpc('set_scheduled_booking_status', { p_booking_id: button.dataset.id, p_status: 'cancelled' })
+      if (error) return showMessage(error.message, 'error')
+      showMessage('Registration cancelled and the place is available again.')
+      await renderSchedule(business, access)
+    }))
+    target.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }
+
   document.getElementById('sessionForm')?.addEventListener('submit', async event => {
     event.preventDefault()
     if (!document.getElementById('sessionStaff').value) return showMessage('Assign a staff member to this service first.', 'error')
@@ -353,6 +451,15 @@ async function renderSchedule(business, access) {
     if (error) return showMessage(error.message, 'error')
     showMessage('Session cancelled.')
     await renderSchedule(business, access)
+  }))
+  document.querySelectorAll('.view-session').forEach(button => button.addEventListener('click', () => {
+    renderSessionDetails(scheduled.find(session => session.id === Number(button.dataset.id)))
+  }))
+  document.querySelectorAll('.copy-session').forEach(button => button.addEventListener('click', () => {
+    const session = scheduled.find(item => item.id === Number(button.dataset.id))
+    populateCreateForm(session)
+    document.getElementById('sessionDate').focus()
+    showMessage('Session copied into the new calendar entry. Choose the date and add it when ready.')
   }))
 }
 
