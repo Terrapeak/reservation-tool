@@ -204,6 +204,7 @@ async function addUniversalBookingNavigation() {
   const links = [
     ['Services', 'services'],
     ['Staff', 'staff'],
+    ['Schedule', 'schedule'],
     ['Availability', 'availability']
   ]
 
