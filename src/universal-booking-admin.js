@@ -400,19 +400,46 @@ async function renderAvailability(business, access) {
     })
   }
 
+  function appendPeriod(container, start = '09:00', end = '17:00') {
+    const row = document.createElement('div')
+    row.className = 'period-row'
+    row.innerHTML = `<input class="period-start" type="time" value="${start.slice(0, 5)}" aria-label="Start time"><span>to</span><input class="period-end" type="time" value="${end.slice(0, 5)}" aria-label="End time"><button type="button" class="remove-period" aria-label="Remove time period">Remove</button>`
+    container.insertBefore(row, container.querySelector('.add-period'))
+    wirePeriodRow(row)
+    return row
+  }
+
   document.querySelectorAll('.period-row').forEach(wirePeriodRow)
   document.querySelectorAll('.add-period').forEach(button => {
     button.addEventListener('click', () => {
       const container = document.querySelector(`.day-periods[data-day="${button.dataset.day}"]`)
-      const row = document.createElement('div')
-      row.className = 'period-row'
-      row.innerHTML = '<input class="period-start" type="time" value="09:00" aria-label="Start time"><span>to</span><input class="period-end" type="time" value="17:00" aria-label="End time"><button type="button" class="remove-period" aria-label="Remove time period">Remove</button>'
-      container.insertBefore(row, button)
+      const row = appendPeriod(container)
       document.querySelector(`.day-enabled[data-day="${button.dataset.day}"]`).checked = true
-      wirePeriodRow(row)
       row.querySelector('.period-start').focus()
     })
   })
+
+  async function loadWeeklySchedule() {
+    const staffId = Number(document.getElementById('availabilityStaff')?.value)
+    if (!staffId) return
+    const serviceValue = document.getElementById('availabilityService').value
+    let query = supabase.from('availability_rules').select('day_of_week, start_time, end_time')
+      .eq('staff_id', staffId).eq('is_active', true).order('start_time')
+    query = serviceValue ? query.eq('service_id', Number(serviceValue)) : query.is('service_id', null)
+    const { data: savedRules, error } = await query
+    if (error) return showMessage(error.message, 'error')
+    days.forEach((day, dayIndex) => {
+      const container = document.querySelector(`.day-periods[data-day="${dayIndex}"]`)
+      container.querySelectorAll('.period-row').forEach(row => row.remove())
+      const periods = savedRules.filter(rule => rule.day_of_week === dayIndex)
+      document.querySelector(`.day-enabled[data-day="${dayIndex}"]`).checked = periods.length > 0
+      if (periods.length) periods.forEach(period => appendPeriod(container, period.start_time, period.end_time))
+      else appendPeriod(container)
+    })
+  }
+
+  document.getElementById('availabilityStaff')?.addEventListener('change', loadWeeklySchedule)
+  document.getElementById('availabilityService')?.addEventListener('change', loadWeeklySchedule)
 
   document.getElementById('availabilityForm')?.addEventListener('submit', async (event) => {
     event.preventDefault()
@@ -443,6 +470,7 @@ async function renderAvailability(business, access) {
       if (error) return showMessage(error.message, 'error')
     }
     showMessage('Weekly availability saved.')
+    await loadWeeklySchedule()
   })
 
   document.getElementById('exceptionForm')?.addEventListener('submit', async (event) => {
@@ -483,5 +511,6 @@ async function renderAvailability(business, access) {
   }
 
   document.getElementById('exceptionStaff')?.addEventListener('change', loadExceptions)
+  await loadWeeklySchedule()
   await loadExceptions()
 }
