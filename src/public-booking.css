@@ -18,3 +18,50 @@
 
 .booking-form .booking-confirm{display:block!important;visibility:visible!important;opacity:1!important;width:100%;margin-top:18px;border:0;border-radius:10px;background:#285b3b;color:#fff;padding:14px 20px;font:inherit;font-weight:800;cursor:pointer}
 .booking-form .booking-confirm:disabled{opacity:.65!important;cursor:wait}
+
+/* Keep the public booking controls independent from the legacy public form theme. */
+body.public-booking-page .booking-shell .session-choice{
+  display:grid!important;
+  background:#fff!important;
+  color:#183126!important;
+  border-color:#dce7df!important;
+  opacity:1!important;
+  visibility:visible!important;
+}
+body.public-booking-page .booking-shell .session-choice strong{
+  display:block!important;
+  color:#183126!important;
+  opacity:1!important;
+  visibility:visible!important;
+}
+body.public-booking-page .booking-shell .session-choice:hover,
+body.public-booking-page .booking-shell .session-choice.selected{
+  background:#f0f7f2!important;
+  color:#183126!important;
+  border-color:#285b3b!important;
+}
+body.public-booking-page .booking-shell .booking-form .booking-confirm{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  width:100%!important;
+  min-height:48px!important;
+  margin-top:18px!important;
+  border:1px solid #285b3b!important;
+  background:#285b3b!important;
+  color:#fff!important;
+}
+body.public-booking-page .booking-shell .booking-form .booking-confirm:hover{
+  background:#1f472f!important;
+  color:#fff!important;
+}
+body.public-booking-page .booking-shell .slot{
+  background:#f5faf6!important;
+  color:#285b3b!important;
+  border-color:#8bb49a!important;
+}
+body.public-booking-page .booking-shell .slot:hover,
+body.public-booking-page .booking-shell .slot.selected{
+  background:#285b3b!important;
+  color:#fff!important;
+}
