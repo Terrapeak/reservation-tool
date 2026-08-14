@@ -216,11 +216,11 @@ create policy "services_member_read"
   using ((select private.has_business_role(business_id)));
 create policy "services_manager_insert"
   on public.services for insert to authenticated
-  with check ((select private.has_business_role(business_id, array['owner', 'manager']))));
+  with check ((select private.has_business_role(business_id, array['owner', 'manager'])));
 create policy "services_manager_update"
   on public.services for update to authenticated
   using ((select private.has_business_role(business_id, array['owner', 'manager'])))
-  with check ((select private.has_business_role(business_id, array['owner', 'manager']))));
+  with check ((select private.has_business_role(business_id, array['owner', 'manager'])));
 create policy "services_manager_delete"
   on public.services for delete to authenticated
   using ((select private.has_business_role(business_id, array['owner', 'manager'])));
@@ -233,11 +233,11 @@ create policy "staff_member_read"
   using ((select private.has_business_role(business_id)));
 create policy "staff_manager_insert"
   on public.staff_members for insert to authenticated
-  with check ((select private.has_business_role(business_id, array['owner', 'manager']))));
+  with check ((select private.has_business_role(business_id, array['owner', 'manager'])));
 create policy "staff_manager_update"
   on public.staff_members for update to authenticated
   using ((select private.has_business_role(business_id, array['owner', 'manager'])))
-  with check ((select private.has_business_role(business_id, array['owner', 'manager']))));
+  with check ((select private.has_business_role(business_id, array['owner', 'manager'])));
 create policy "staff_manager_delete"
   on public.staff_members for delete to authenticated
   using ((select private.has_business_role(business_id, array['owner', 'manager'])));
