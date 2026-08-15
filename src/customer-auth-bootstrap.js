@@ -105,6 +105,14 @@ async function startCustomerDashboardView(validBusiness) {
       return
     }
 
+    window.__TERRAPEAK_RESERVATIONS_CONTEXT__ = Object.freeze({
+      companyId: String(bootstrap.companyId || ''),
+      companyRole: String(bootstrap.companyRole || 'viewer').toLowerCase(),
+      businessId: Number(bootstrap.businessId),
+      businessSlug: bootstrap.businessSlug,
+      source: 'terrapeak-dashboard'
+    })
+
     completed = true
     window.removeEventListener('message', receiveSession)
     await import('./main.js')
