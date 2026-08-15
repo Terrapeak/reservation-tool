@@ -10,7 +10,22 @@ async function start(){
   document.body.classList.add('onboarding-page')
   const {data}=await supabase.auth.getSession()
   if(!data.session) return authScreen()
-  setupScreen(data.session)
+  routeSignedInOwner(data.session)
+}
+
+async function routeSignedInOwner(session){
+  const {data:membership}=await supabase
+    .from('business_memberships')
+    .select('businesses(business_slug)')
+    .eq('user_id',session.user.id)
+    .limit(1)
+    .maybeSingle()
+  const businessSlug=membership?.businesses?.business_slug
+  if(businessSlug){
+    location.href='/'+businessSlug+'/dashboard'
+    return
+  }
+  setupScreen(session)
 }
 
 function frame(content){
@@ -23,16 +38,21 @@ function authScreen(){
     event.preventDefault()
     const values=new FormData(event.currentTarget), action=event.submitter.value
     const credentials={email:values.get('email').trim(),password:values.get('password')}
-    const result=action==='signup'?await supabase.auth.signUp(credentials):await supabase.auth.signInWithPassword(credentials)
+    const result=action==='signup'
+      ? await supabase.auth.signUp({
+          ...credentials,
+          options:{emailRedirectTo:window.location.origin+'/onboarding'}
+        })
+      : await supabase.auth.signInWithPassword(credentials)
     const message=document.querySelector('#onboardingMessage')
     if(result.error){
       message.textContent=action==='signin'&&result.error.message.toLowerCase().includes('invalid login')
-        ? 'That email and password do not match a staging account. If this is your first visit, choose Create new account.'
+        ? 'That email and password do not match an account. If this is your first visit, choose Create new account.'
         : result.error.message
       return
     }
     if(!result.data.session){message.textContent='Check your email to confirm your account, then return here to sign in.';return}
-    setupScreen(result.data.session)
+    routeSignedInOwner(result.data.session)
   }
 }
 
