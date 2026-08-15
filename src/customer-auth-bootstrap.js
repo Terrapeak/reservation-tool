@@ -12,7 +12,18 @@ const TERRAPEAK_DASHBOARD_ORIGINS = new Set([
 
 const pathParts = window.location.pathname.split('/').filter(Boolean)
 const businessSlug = pathParts[0] || ''
-const reservedSegments = new Set(['admin', 'dashboard', 'analytics', 'settings', 'services', 'staff', 'schedule', 'availability', 'book', 'onboarding'])
+const managementSegments = new Set([
+  'admin',
+  'dashboard',
+  'analytics',
+  'settings',
+  'services',
+  'staff',
+  'schedule',
+  'availability'
+])
+const reservedSegments = new Set([...managementSegments, 'book', 'onboarding'])
+const isManagementRoute = pathParts.length > 1 && managementSegments.has(String(pathParts[1] || '').toLowerCase())
 
 async function validateBusinessRoute() {
   if (!businessSlug || reservedSegments.has(businessSlug.toLowerCase())) {
@@ -41,7 +52,24 @@ function renderUnavailable(message = 'This Reservations workspace is not configu
   `
 }
 
+function getTrustedParentOrigin() {
+  if (!document.referrer) return ''
+
+  try {
+    const origin = new URL(document.referrer).origin
+    return TERRAPEAK_DASHBOARD_ORIGINS.has(origin) ? origin : ''
+  } catch {
+    return ''
+  }
+}
+
 async function startCustomerDashboardView(validBusiness) {
+  const parentOrigin = getTrustedParentOrigin()
+  if (!parentOrigin || window.parent === window) {
+    renderUnavailable('Reservations management must be opened from the TerraPeak Dashboard.')
+    return
+  }
+
   document.querySelector('#app').innerHTML = `
     <main class="auth-card">
       <h1>Opening Reservations</h1>
@@ -53,7 +81,7 @@ async function startCustomerDashboardView(validBusiness) {
 
   const receiveSession = async (event) => {
     if (completed || event.source !== window.parent) return
-    if (!TERRAPEAK_DASHBOARD_ORIGINS.has(event.origin)) return
+    if (event.origin !== parentOrigin) return
     if (event.data?.type !== 'terrapeak:reservations-session') return
 
     const bootstrap = event.data.bootstrap
@@ -83,13 +111,18 @@ async function startCustomerDashboardView(validBusiness) {
   }
 
   window.addEventListener('message', receiveSession)
-  window.parent.postMessage({ type: 'terrapeak:reservations-ready', businessSlug }, '*')
+  window.parent.postMessage(
+    { type: 'terrapeak:reservations-ready', businessSlug },
+    parentOrigin
+  )
 }
 
 const validBusiness = await validateBusinessRoute()
 
 if (!validBusiness) {
   renderUnavailable()
+} else if (isManagementRoute && !isCustomerDashboardView) {
+  renderUnavailable('Reservations management is controlled by TerraPeak. Open this company from the TerraPeak Dashboard instead of signing in separately.')
 } else if (isCustomerDashboardView) {
   await startCustomerDashboardView(validBusiness)
 } else {
