@@ -58,38 +58,67 @@ async function loadCurrentBusiness() {
   return data
 }
 
-function isAdminLoggedIn() {
-  const loginExpiry = localStorage.getItem('adminLoginExpiry')
+async function requireAdminAccess(businessName) {
+  const { data: sessionData } = await supabase.auth.getSession()
+  const session = sessionData.session
 
-  if (!loginExpiry) {
+  if (!session) {
+    document.querySelector('#app').innerHTML = `
+      <main class="auth-card">
+        <h1>Sign in to manage ${businessName}</h1>
+        <p>Use an owner or manager account assigned to this business.</p>
+        <form id="legacyAdminSignIn">
+          <input id="legacyAdminEmail" type="email" autocomplete="email" placeholder="Email" required />
+          <br /><br />
+          <input id="legacyAdminPassword" type="password" autocomplete="current-password" placeholder="Password" required />
+          <br /><br />
+          <button type="submit">Sign in</button>
+        </form>
+        <div id="legacyAdminAuthMessage"></div>
+      </main>
+    `
+    document.getElementById('legacyAdminSignIn').addEventListener('submit', async event => {
+      event.preventDefault()
+      const button = event.currentTarget.querySelector('button')
+      button.disabled = true
+      const { error } = await supabase.auth.signInWithPassword({
+        email: document.getElementById('legacyAdminEmail').value.trim(),
+        password: document.getElementById('legacyAdminPassword').value
+      })
+      if (error) {
+        document.getElementById('legacyAdminAuthMessage').textContent = error.message
+        button.disabled = false
+        return
+      }
+      window.location.reload()
+    })
     return false
   }
 
-  return Date.now() < Number(loginExpiry)
-}
+  const { data: membership } = await supabase
+    .from('business_memberships')
+    .select('role')
+    .eq('business_id', currentBusinessId)
+    .eq('user_id', session.user.id)
+    .in('role', ['owner', 'manager'])
+    .maybeSingle()
 
-function saveAdminLogin() {
-  const eightHours = 8 * 60 * 60 * 1000
-  const expiryTime = Date.now() + eightHours
-
-  localStorage.setItem('adminLoginExpiry', expiryTime)
-}
-
-function requireAdminPassword() {
-  const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD
-
-  if (isAdminLoggedIn()) {
-    return true
+  if (!membership) {
+    document.querySelector('#app').innerHTML = `
+      <main class="auth-card">
+        <h1>Access is not assigned</h1>
+        <p>Your signed-in account is not an owner or manager of ${businessName}.</p>
+        <button type="button" id="legacyAdminSignOut">Sign out</button>
+      </main>
+    `
+    document.getElementById('legacyAdminSignOut').addEventListener('click', async () => {
+      await supabase.auth.signOut()
+      window.location.reload()
+    })
+    return false
   }
 
-  const enteredPassword = prompt('Enter admin password:')
-
-  if (enteredPassword === adminPassword) {
-    saveAdminLogin()
-    return true
-  }
-
-  return false
+  return true
 }
 
 async function loadBranding() {
@@ -324,6 +353,15 @@ if (pageRoute === '/') {
 
   <br /><br />
 
+  <input
+    type="text"
+    id="cancelPhone"
+    placeholder="Phone Number Used for Booking"
+    required
+  />
+
+  <br /><br />
+
   <button type="submit">
     Cancel ${profile.booking_label}
   </button>
@@ -331,45 +369,53 @@ if (pageRoute === '/') {
 
 <div id="cancelMessage"></div>
 
+<hr>
+<h2>Reschedule ${profile.booking_label}</h2>
+<form id="rescheduleForm">
+  <input id="rescheduleReference" placeholder="${profile.booking_label} Reference" required />
+  <br /><br />
+  <input id="reschedulePhone" placeholder="Phone Number Used for Booking" required />
+  <br /><br />
+  <input id="rescheduleDate" type="date" required />
+  <br /><br />
+  <button id="loadRescheduleSlots" type="button">Show Available Times</button>
+  <select id="rescheduleTime" hidden required></select>
+  <button id="confirmReschedule" type="submit" hidden>Confirm New Time</button>
+</form>
+<div id="rescheduleMessage"></div>
+
 `
 
 const form = document.getElementById('reservationForm')
 const submitButton = form.querySelector('button[type="submit"]')
 const cancelForm = document.getElementById('cancelForm')
 const cancelButton = cancelForm.querySelector('button[type="submit"]')
+const rescheduleForm = document.getElementById('rescheduleForm')
+const loadRescheduleSlots = document.getElementById('loadRescheduleSlots')
+const rescheduleTime = document.getElementById('rescheduleTime')
+const confirmReschedule = document.getElementById('confirmReschedule')
+const rescheduleDate = document.getElementById('rescheduleDate')
+rescheduleDate.min = new Date().toISOString().split('T')[0]
+rescheduleDate.max = new Date(Date.now() + 730 * 86400000).toISOString().split('T')[0]
 
 async function checkAvailability(
   reservation_date,
   reservation_time,
   requestedGuests
 ) {
-  const { data, error } = await supabase
-    .from('reservations')
-    .select('*')
-    .eq('business_id', currentBusinessId)
-    .eq('reservation_date', reservation_date)
-    .eq('reservation_time', reservation_time)
-    .eq('status', 'confirmed')
+  const { data, error } = await supabase.rpc('check_public_restaurant_availability', {
+    p_business_slug: currentBusinessSlug,
+    p_reservation_date: reservation_date,
+    p_reservation_time: normalizeTime(reservation_time),
+    p_party_size: requestedGuests
+  })
 
   if (error) {
     console.error(error)
     return false
   }
 
-  const currentGuests = data.reduce(
-    (total, reservation) =>
-      total + reservation.party_size,
-    0
-  )
-
-  const settings = await loadRestaurantSettings()
-  const maxGuestsPerSlot = settings.max_guests_per_slot
-
-  return (
-    currentGuests + requestedGuests
-    <=
-    maxGuestsPerSlot
-  )
+  return data === true
 }
 
 function timeToMinutes(time) {
@@ -472,9 +518,6 @@ submitButton.textContent = 'Creating Reservation...'
       ? parseInt(document.getElementById('guests').value)
       : 1
   const special_request = document.getElementById('request').value
-  const reservation_reference =
-  await generateReservationReference(reservation_date, profile)
-
 if (!(await isWithinOpeningHours(reservation_time))) {
   const message = document.getElementById('message')
 
@@ -544,21 +587,19 @@ custom_data[field.field_label] =
     : customInput.value
 })
 
-  const { error } = await supabase
-    .from('reservations')
-    .insert([
-      {
-        business_id: currentBusinessId,
-        customer_name,
-        phone,
-        reservation_date,
-        reservation_time,
-        party_size,
-        special_request,
-        reservation_reference,
-        custom_data
-      }
-    ])
+  const { data: reservation_reference, error } = await supabase.rpc(
+    'create_public_restaurant_reservation',
+    {
+      p_business_slug: currentBusinessSlug,
+      p_customer_name: customer_name,
+      p_phone: phone,
+      p_reservation_date: reservation_date,
+      p_reservation_time: normalizeTime(reservation_time),
+      p_party_size: party_size,
+      p_special_request: special_request || null,
+      p_custom_data: custom_data
+    }
+  )
 
   const message = document.getElementById('message')
 
@@ -593,13 +634,12 @@ cancelForm.addEventListener('submit', async (e) => {
     .value
     .trim()
 
-  const { data, error } = await supabase
-    .from('reservations')
-    .update({ status: 'cancelled' })
-    .eq('business_id', currentBusinessId)
-    .eq('reservation_reference', reservation_reference)
-    .eq('status', 'confirmed')
-    .select()
+  const phone = document.getElementById('cancelPhone').value.trim()
+  const { data, error } = await supabase.rpc('cancel_public_restaurant_reservation', {
+    p_business_slug: currentBusinessSlug,
+    p_reservation_reference: reservation_reference,
+    p_phone: phone
+  })
 
   const cancelMessage = document.getElementById('cancelMessage')
 
@@ -617,7 +657,7 @@ cancelForm.addEventListener('submit', async (e) => {
     return
   }
 
-  if (data.length === 0) {
+  if (data !== true) {
     cancelMessage.innerHTML = `
       <p style="color:red">
         No active ${profile.booking_label.toLowerCase()} found with that reference number.
@@ -643,6 +683,56 @@ cancelForm.addEventListener('submit', async (e) => {
   cancelButton.textContent = 'Cancel Reservation'
 })
 
+loadRescheduleSlots.addEventListener('click', async () => {
+  const reference = document.getElementById('rescheduleReference').value.trim()
+  const phone = document.getElementById('reschedulePhone').value.trim()
+  const message = document.getElementById('rescheduleMessage')
+  if (!reference || !phone || !rescheduleDate.value) {
+    message.innerHTML = '<p style="color:red">Enter your reference, phone number and preferred date.</p>'
+    return
+  }
+  loadRescheduleSlots.disabled = true
+  message.textContent = 'Checking available times...'
+  const { data, error } = await supabase.rpc('get_public_restaurant_reschedule_slots', {
+    p_business_slug: currentBusinessSlug,
+    p_reservation_reference: reference,
+    p_phone: phone,
+    p_local_date: rescheduleDate.value
+  })
+  loadRescheduleSlots.disabled = false
+  if (error || !data?.length) {
+    rescheduleTime.hidden = true
+    confirmReschedule.hidden = true
+    message.innerHTML = '<p style="color:red">No available times found. Check your details or choose another date.</p>'
+    return
+  }
+  rescheduleTime.innerHTML = data.map(row => '<option value="' + row.reservation_time + '">' + row.reservation_time.slice(0, 5) + '</option>').join('')
+  rescheduleTime.hidden = false
+  confirmReschedule.hidden = false
+  message.textContent = 'Choose a new time and confirm.'
+})
+
+rescheduleForm.addEventListener('submit', async (e) => {
+  e.preventDefault()
+  confirmReschedule.disabled = true
+  const { data, error } = await supabase.rpc('reschedule_public_restaurant_reservation', {
+    p_business_slug: currentBusinessSlug,
+    p_reservation_reference: document.getElementById('rescheduleReference').value.trim(),
+    p_phone: document.getElementById('reschedulePhone').value.trim(),
+    p_new_date: rescheduleDate.value,
+    p_new_time: rescheduleTime.value
+  })
+  confirmReschedule.disabled = false
+  const message = document.getElementById('rescheduleMessage')
+  if (error || data !== true) {
+    message.innerHTML = '<p style="color:red">Could not reschedule. The time may have just been taken.</p>'
+    return
+  }
+  message.innerHTML = '<p style="color:green">Your new reservation time is confirmed.</p>'
+  rescheduleTime.hidden = true
+  confirmReschedule.hidden = true
+})
+
 }
 
 if (pageRoute === '/admin') {
@@ -650,11 +740,8 @@ if (pageRoute === '/admin') {
   const profile = await loadBusinessProfile()
   const businesses = await loadBusinesses()
 
-  if (!requireAdminPassword()) {
-  document.querySelector('#app').innerHTML = `
-    <h1>Access Denied</h1>
-    <p>You are not authorized to view this page.</p>
-  `
+  if (!(await requireAdminAccess(profile.business_name))) {
+  // The sign-in or access message is rendered by requireAdminAccess.
 } else {
   document.querySelector('#app').innerHTML = `
   ${branding.logo_url ? `<img src="${branding.logo_url}" class="brand-logo" />` : ''}
@@ -1177,11 +1264,8 @@ if (pageRoute === '/admin/settings') {
     .select('*')
     .eq('business_id', currentBusinessId)
     .single()
-if (!requireAdminPassword()) {
-    document.querySelector('#app').innerHTML = `
-      <h1>Access Denied</h1>
-      <p>You are not authorized to view this page.</p>
-    `
+if (!(await requireAdminAccess(profile.business_name))) {
+    // The sign-in or access message is rendered by requireAdminAccess.
   } else {
     document.querySelector('#app').innerHTML = `
       ${branding.logo_url ? `<img src="${branding.logo_url}" class="brand-logo" />` : ''}
@@ -1929,11 +2013,8 @@ if (businessSwitcher) {
   const businesses = await loadBusinesses()
   const profile = await loadBusinessProfile()
 
-  if (!requireAdminPassword()) {
-    document.querySelector('#app').innerHTML = `
-      <h1>Access Denied</h1>
-      <p>You are not authorized to view this page.</p>
-    `
+  if (!(await requireAdminAccess(profile.business_name))) {
+    // The sign-in or access message is rendered by requireAdminAccess.
   } else {
 
     document.querySelector('#app').innerHTML = `
