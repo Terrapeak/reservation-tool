@@ -27,7 +27,14 @@
     <div id="app"></div>
     <script type="module">
       if (window.location.pathname === '/onboarding' || window.location.pathname === '/onboarding/') {
-        await import('/src/owner-onboarding.js')
+        document.querySelector('#app').innerHTML = `
+          <main class="auth-card">
+            <h1>Reservations setup is managed by TerraPeak</h1>
+            <p>Independent Reservations account and business creation is temporarily disabled while customer access is consolidated with the TerraPeak Platform.</p>
+            <p>Please open Reservations from your TerraPeak customer workspace.</p>
+            <a href="https://dashboard.terrapeakgroup.com/dashboard">Open TerraPeak Dashboard</a>
+          </main>
+        `
       } else if (window.location.pathname.startsWith('/book/')) {
         await import('/src/public-booking.js')
       } else {
