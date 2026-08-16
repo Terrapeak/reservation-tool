@@ -175,7 +175,10 @@ if (!validBusiness) {
 } else if (isManagementRoute && !isCustomerDashboardView) {
   renderUnavailable('Reservations management is controlled by TerraPeak. Open this company from the TerraPeak Dashboard instead of signing in separately.')
 } else if (isCustomerDashboardView) {
-  await startCustomerDashboardView(validBusiness)
+  const connected = await startCustomerDashboardView(validBusiness)
+  if (connected) {
+    await import('./main.js')
+  }
 } else {
   await import('./main.js')
 }
