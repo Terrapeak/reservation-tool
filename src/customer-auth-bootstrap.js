@@ -108,6 +108,8 @@ async function startCustomerDashboardView(validBusiness) {
     window.__TERRAPEAK_RESERVATIONS_CONTEXT__ = Object.freeze({
       companyId: String(bootstrap.companyId || ''),
       companyRole: String(bootstrap.companyRole || 'viewer').toLowerCase(),
+      capabilities: Object.freeze({ ...(bootstrap.capabilities || {}) }),
+      reservationsCompatibilityRole: String(bootstrap.reservationsCompatibilityRole || ''),
       businessId: Number(bootstrap.businessId),
       businessSlug: bootstrap.businessSlug,
       source: 'terrapeak-dashboard'
