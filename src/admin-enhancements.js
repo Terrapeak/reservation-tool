@@ -39,26 +39,24 @@ function setActivePreset(container, activeButton) {
 function updateDocumentTitle() {
   const path = window.location.pathname
 
-  if (path.includes('/dashboard/analytics')) {
-    document.title = 'TerraPeak Analytics'
+  if (path.includes('/dashboard/analytics') || path.includes('/admin/analytics')) {
+    document.title = 'TerraPeak Reservations | Analytics'
     return
   }
 
-  if (path.includes('/dashboard/settings')) {
-    document.title = 'TerraPeak Settings'
+  if (path.includes('/dashboard/settings') || path.includes('/admin/settings')) {
+    document.title = 'TerraPeak Reservations | Settings'
     return
   }
 
-  if (path.includes('/dashboard')) {
-    document.title = 'TerraPeak Dashboard'
-  }
+  document.title = 'TerraPeak Reservations'
 }
 
 async function updateDashboardHeading() {
   const heading = await waitForElement('h1')
   if (!heading) return
 
-  heading.textContent = heading.textContent.replace(' Admin Dashboard', ' Dashboard')
+  heading.textContent = heading.textContent.replace(' Admin Dashboard', ' Reservations')
 }
 
 function createDateRangePanel({ startInput, endInput, loadButton, insertBefore }) {
@@ -196,25 +194,61 @@ function setSettingsTabColors() {
   })
 }
 
-async function addUniversalBookingNavigation() {
+function getManagementRoute() {
+  const parts = window.location.pathname.split('/').filter(Boolean)
+  return String(parts.slice(1).join('/') || 'dashboard')
+    .replace(/^admin\/?/, 'dashboard/')
+    .replace(/^dashboard\/$/, 'dashboard')
+}
+
+async function installUnifiedReservationsNavigation() {
   const nav = await waitForElement('.admin-nav')
-  if (!nav || nav.querySelector('[data-universal-booking-link]')) return
+  if (!nav) return
 
   const businessSlug = window.location.pathname.split('/').filter(Boolean)[0]
+  if (!businessSlug) return
+
   const links = [
-    ['Services', 'services'],
-    ['Staff', 'staff'],
-    ['Schedule', 'schedule'],
-    ['Availability', 'availability']
+    ['Overview', 'dashboard'],
+    ['Bookings', 'dashboard'],
+    ['Services', 'dashboard/services'],
+    ['Team & Resources', 'dashboard/staff'],
+    ['Availability', 'dashboard/availability'],
+    ['Analytics', 'dashboard/analytics'],
+    ['Settings', 'dashboard/settings']
   ]
 
-  links.forEach(([label, page]) => {
+  const activeRoute = getManagementRoute()
+  nav.replaceChildren()
+  nav.dataset.reservationsNavigation = 'unified'
+
+  links.forEach(([label, route]) => {
     const link = document.createElement('a')
-    link.dataset.universalBookingLink = page
-    link.href = `/${businessSlug}/dashboard/${page}`
+    link.href = `/${businessSlug}/${route}`
     link.textContent = label
+    link.dataset.reservationsNavLink = route
+
+    const isActive =
+      activeRoute === route ||
+      (route === 'dashboard' && activeRoute === 'dashboard')
+
+    if (isActive) {
+      link.classList.add('active')
+      link.setAttribute('aria-current', 'page')
+    }
+
     nav.appendChild(link)
   })
+}
+
+function removeLegacyTenantSwitcher() {
+  const switcher = document.getElementById('businessSwitcher')
+  if (!switcher) return
+
+  const next = switcher.nextElementSibling
+  switcher.remove()
+
+  if (next?.tagName === 'BR') next.remove()
 }
 
 function startEnhancements() {
@@ -222,7 +256,8 @@ function startEnhancements() {
   updateDashboardHeading()
   enhanceDashboardPage()
   enhanceAnalyticsPage()
-  addUniversalBookingNavigation()
+  installUnifiedReservationsNavigation()
+  waitForElement('#businessSwitcher').then(removeLegacyTenantSwitcher)
   waitForElement('#businessSettingsSection').then(setSettingsTabColors)
 }
 
