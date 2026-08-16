@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="/src/owner-onboarding.css" />
     <link rel="stylesheet" href="/src/public-ui.css" />
     <link rel="stylesheet" href="/src/customer-view.css" />
+    <link rel="stylesheet" href="/src/reservations-management-shell.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TerraPeak Reservations</title>
   </head>
@@ -32,7 +33,7 @@
             <h1>Reservations setup is managed by TerraPeak</h1>
             <p>Independent Reservations account and business creation is temporarily disabled while customer access is consolidated with the TerraPeak Platform.</p>
             <p>Please open Reservations from your TerraPeak customer workspace.</p>
-            <a href="https://dashboard.terrapeakgroup.com/dashboard">Open TerraPeak Dashboard</a>
+            <a href="https://dashboard.terrapeakgroup.com/dashboard/reservations">Open TerraPeak Reservations</a>
           </main>
         `
       } else if (window.location.pathname.startsWith('/book/')) {
@@ -44,6 +45,7 @@
         await import('/src/customer-tenant-lock.js')
         await import('/src/business-name-unification.js')
         await import('/src/custom-field-option-repair.js')
+        await import('/src/reservations-management-shell.js')
       }
     </script>
     <script type="module">
@@ -55,11 +57,11 @@
       const currentPath = window.location.pathname
 
       if (currentPath.includes('/dashboard/analytics')) {
-        document.title = 'TerraPeak Analytics'
+        document.title = 'TerraPeak Reservations | Analytics'
       } else if (currentPath.includes('/dashboard/settings')) {
-        document.title = 'TerraPeak Settings'
+        document.title = 'TerraPeak Reservations | Settings'
       } else if (currentPath.includes('/dashboard')) {
-        document.title = 'TerraPeak Dashboard'
+        document.title = 'TerraPeak Reservations'
       }
     </script>
   </body>
