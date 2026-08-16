@@ -1,0 +1,107 @@
+.unified-reservations-management #app {
+  width: 100%;
+  max-width: none;
+}
+
+.reservations-management-shell {
+  width: 100%;
+  min-height: 100%;
+  background: #f7f8fa;
+  color: #17233a;
+}
+
+.reservations-shell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.reservations-shell-header h1 {
+  margin: 2px 0 4px;
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  line-height: 1.2;
+}
+
+.reservations-shell-header p {
+  margin: 0;
+}
+
+.reservations-shell-eyebrow {
+  color: #2f5d50;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.reservations-shell-nav {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 10px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+  -webkit-overflow-scrolling: touch;
+}
+
+.reservations-shell-nav a {
+  flex: 0 0 auto;
+  padding: 9px 12px;
+  border-radius: 8px;
+  color: #40536c;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.reservations-shell-nav a:hover {
+  background: #f1f5f9;
+  color: #1d3e5e;
+}
+
+.reservations-shell-nav a.active {
+  background: #e9f0f6;
+  color: #1d3e5e;
+}
+
+.reservations-shell-content {
+  padding: 20px;
+}
+
+.reservations-shell-content > .brand-logo,
+.reservations-shell-content > h1,
+.reservations-shell-content > .universal-header,
+.reservations-shell-content > .universal-nav,
+.reservations-shell-content > .admin-nav,
+.reservations-shell-content > #businessSwitcher {
+  display: none !important;
+}
+
+.reservations-shell-content .universal-grid,
+.reservations-shell-content .summary-grid {
+  margin-top: 0;
+}
+
+.reservations-shell-content .universal-admin {
+  padding: 0;
+  background: transparent;
+}
+
+@media (max-width: 720px) {
+  .reservations-shell-header {
+    padding: 18px 16px 12px;
+  }
+
+  .reservations-shell-nav {
+    padding: 8px 12px;
+  }
+
+  .reservations-shell-content {
+    padding: 14px 12px 20px;
+  }
+}
