@@ -27,25 +27,60 @@
     </script>
     <div id="app"></div>
     <script type="module">
-      if (window.location.pathname === '/onboarding' || window.location.pathname === '/onboarding/') {
+      const currentPath = window.location.pathname
+      const currentParts = currentPath.split('/').filter(Boolean)
+      const currentRoute = currentParts.slice(1).join('/')
+      const legacyManagementRoutes = new Set([
+        'admin',
+        'admin/analytics',
+        'admin/settings'
+      ])
+      const universalManagementRoutes = new Set([
+        'admin/services',
+        'admin/staff',
+        'admin/schedule',
+        'admin/availability'
+      ])
+      const isManagementRoute =
+        legacyManagementRoutes.has(currentRoute) ||
+        universalManagementRoutes.has(currentRoute)
+
+      if (currentPath === '/onboarding' || currentPath === '/onboarding/') {
         document.querySelector('#app').innerHTML = `
           <main class="auth-card">
             <h1>Reservations setup is managed by TerraPeak</h1>
-            <p>Independent Reservations account and business creation is temporarily disabled while customer access is consolidated with the TerraPeak Platform.</p>
+            <p>Independent Reservations account and business creation is disabled. Customer access and provisioning are managed by the TerraPeak Platform.</p>
             <p>Please open Reservations from your TerraPeak customer workspace.</p>
             <a href="https://dashboard.terrapeakgroup.com/dashboard/reservations">Open TerraPeak Reservations</a>
           </main>
         `
-      } else if (window.location.pathname.startsWith('/book/')) {
+      } else if (currentPath.startsWith('/book/')) {
         await import('/src/public-booking.js')
       } else {
+        // Authentication/tenant bootstrap decides when the underlying page may load.
         await import('/src/customer-auth-bootstrap.js')
-        await import('/src/admin-enhancements.js')
-        await import('/src/universal-booking-admin.js')
-        await import('/src/customer-tenant-lock.js')
-        await import('/src/business-name-unification.js')
-        await import('/src/custom-field-option-repair.js')
-        await import('/src/reservations-management-shell.js')
+
+        if (isManagementRoute) {
+          // Shared customer-management boundary and one visible shell.
+          await import('/src/customer-tenant-lock.js')
+          await import('/src/business-name-unification.js')
+
+          if (legacyManagementRoutes.has(currentRoute)) {
+            // Legacy bookings/settings are still present temporarily, but only their
+            // own enhancement layer is loaded. Universal admin is not loaded beside it.
+            await import('/src/admin-enhancements.js')
+            if (currentRoute === 'admin/settings') {
+              await import('/src/custom-field-option-repair.js')
+            }
+          }
+
+          if (universalManagementRoutes.has(currentRoute)) {
+            // Services/team/availability use the universal engine only.
+            await import('/src/universal-booking-admin.js')
+          }
+
+          await import('/src/reservations-management-shell.js')
+        }
       }
     </script>
     <script type="module">
