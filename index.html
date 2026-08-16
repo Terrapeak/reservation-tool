@@ -60,6 +60,7 @@
         await import('/src/customer-auth-bootstrap.js')
 
         if (isManagementRoute && window.__TERRAPEAK_RESERVATIONS_READY__ === true) {
+          await import('/src/trusted-management-runtime.js')
           await import('/src/customer-tenant-lock.js')
           await import('/src/business-name-unification.js')
 
