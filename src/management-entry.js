@@ -33,4 +33,5 @@ if (universalRoutes.has(route)) {
   await import('./universal-booking-admin.js')
 }
 
+await import('./management-capability-ui.js')
 await import('./reservations-management-shell.js')
