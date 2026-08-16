@@ -30,20 +30,15 @@
       const currentPath = window.location.pathname
       const currentParts = currentPath.split('/').filter(Boolean)
       const currentRoute = currentParts.slice(1).join('/')
-      const legacyManagementRoutes = new Set([
+      const managementRoutes = new Set([
         'admin',
         'admin/analytics',
-        'admin/settings'
-      ])
-      const universalManagementRoutes = new Set([
+        'admin/settings',
         'admin/services',
         'admin/staff',
         'admin/schedule',
         'admin/availability'
       ])
-      const isManagementRoute =
-        legacyManagementRoutes.has(currentRoute) ||
-        universalManagementRoutes.has(currentRoute)
 
       if (currentPath === '/onboarding' || currentPath === '/onboarding/') {
         document.querySelector('#app').innerHTML = `
@@ -59,24 +54,9 @@
       } else {
         await import('/src/customer-auth-bootstrap.js')
 
-        if (isManagementRoute && window.__TERRAPEAK_RESERVATIONS_READY__ === true) {
+        if (managementRoutes.has(currentRoute) && window.__TERRAPEAK_RESERVATIONS_READY__ === true) {
           await import('/src/trusted-management-runtime.js')
-          await import('/src/customer-tenant-lock.js')
-          await import('/src/business-name-unification.js')
-
-          if (legacyManagementRoutes.has(currentRoute)) {
-            await import('/src/main.js')
-            await import('/src/admin-enhancements.js')
-            if (currentRoute === 'admin/settings') {
-              await import('/src/custom-field-option-repair.js')
-            }
-          }
-
-          if (universalManagementRoutes.has(currentRoute)) {
-            await import('/src/universal-booking-admin.js')
-          }
-
-          await import('/src/reservations-management-shell.js')
+          await import('/src/management-entry.js')
         }
       }
     </script>
