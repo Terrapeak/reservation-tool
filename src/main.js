@@ -1,2241 +1,337 @@
-import './style.css'
 import { supabase } from './supabaseclient.js'
 
-const currentPage = window.location.pathname
-
-const pathParts =
-  window.location.pathname
-    .split('/')
-    .filter(Boolean)
-
-let currentBusinessId = 1
-
-let currentBusinessSlug =
-  pathParts[0] || 'dim-sum-dragon'
-
-let pageRoute = '/'
-
-  if (pathParts.length === 0) {
-    currentBusinessSlug = 'dim-sum-dragon'
-    pageRoute = '/'
+const runtime = window.__TERRAPEAK_RESERVATIONS_RUNTIME__
+if (!runtime || runtime.source !== 'terrapeak-dashboard') {
+  throw new Error('Trusted TerraPeak Reservations runtime is required.')
 }
 
-  if (pathParts.length === 1) {
-    currentBusinessSlug = pathParts[0]
-    pageRoute = '/'
+const businessId = Number(runtime.businessId)
+const businessSlug = String(runtime.businessSlug || '')
+const route = window.location.pathname.split('/').filter(Boolean).slice(1).join('/')
+const hasCapability = (name) => runtime.hasCapability?.(name) === true
+
+function escapeHtml(value = '') {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
 }
 
-  if (pathParts.length > 1) {
-    currentBusinessSlug = pathParts[0]
-    pageRoute = '/' + pathParts.slice(1).join('/')
+function renderNav(active) {
+  const base = `/${businessSlug}/dashboard`
+  return `
+    <nav class="admin-nav" aria-label="Reservations management">
+      <a class="${active === 'bookings' ? 'active' : ''}" href="${base}">Bookings</a>
+      <a class="${active === 'analytics' ? 'active' : ''}" href="${base}/analytics">Analytics</a>
+      <a class="${active === 'settings' ? 'active' : ''}" href="${base}/settings">Settings</a>
+    </nav>
+  `
 }
 
-console.log('PATH PARTS:', pathParts)
-console.log('BUSINESS SLUG:', currentBusinessSlug)
-console.log('PAGE ROUTE:', pageRoute)
+async function loadBusinessContext() {
+  const [{ data: business, error: businessError }, { data: profile }, { data: branding }, { data: settings }] = await Promise.all([
+    supabase.from('businesses').select('*').eq('id', businessId).single(),
+    supabase.from('business_profile').select('*').eq('business_id', businessId).maybeSingle(),
+    supabase.from('restaurant_branding').select('*').eq('business_id', businessId).maybeSingle(),
+    supabase.from('restaurant_settings').select('*').eq('business_id', businessId).maybeSingle()
+  ])
 
-async function loadCurrentBusiness() {
-  console.log('CURRENT BUSINESS SLUG:', currentBusinessSlug)
+  if (businessError || !business) throw businessError || new Error('Reservations business not found.')
 
-  const { data, error } = await supabase
-    .from('businesses')
-    .select('*')
-    .eq('business_slug', currentBusinessSlug)
-    .single()
-
-  if (error) {
-    console.error('Could not load business:', error)
-
-    return {
-      id: 1,
-      business_name: 'Dim Sum Dragon',
-      business_slug: 'dim-sum-dragon',
-      business_type: 'restaurant'
-    }
-  }
-
-  currentBusinessId = data.id
-  return data
-}
-
-async function requireAdminAccess(businessName) {
-  const { data: sessionData } = await supabase.auth.getSession()
-  const session = sessionData.session
-
-  if (!session) {
-    document.querySelector('#app').innerHTML = `
-      <main class="auth-card">
-        <h1>Sign in to manage ${businessName}</h1>
-        <p>Use an owner or manager account assigned to this business.</p>
-        <form id="legacyAdminSignIn">
-          <input id="legacyAdminEmail" type="email" autocomplete="email" placeholder="Email" required />
-          <br /><br />
-          <input id="legacyAdminPassword" type="password" autocomplete="current-password" placeholder="Password" required />
-          <br /><br />
-          <button type="submit">Sign in</button>
-        </form>
-        <div id="legacyAdminAuthMessage"></div>
-      </main>
-    `
-    document.getElementById('legacyAdminSignIn').addEventListener('submit', async event => {
-      event.preventDefault()
-      const button = event.currentTarget.querySelector('button')
-      button.disabled = true
-      const { error } = await supabase.auth.signInWithPassword({
-        email: document.getElementById('legacyAdminEmail').value.trim(),
-        password: document.getElementById('legacyAdminPassword').value
-      })
-      if (error) {
-        document.getElementById('legacyAdminAuthMessage').textContent = error.message
-        button.disabled = false
-        return
-      }
-      window.location.reload()
-    })
-    return false
-  }
-
-  const { data: membership } = await supabase
-    .from('business_memberships')
-    .select('role')
-    .eq('business_id', currentBusinessId)
-    .eq('user_id', session.user.id)
-    .in('role', ['owner', 'manager'])
-    .maybeSingle()
-
-  if (!membership) {
-    document.querySelector('#app').innerHTML = `
-      <main class="auth-card">
-        <h1>Access is not assigned</h1>
-        <p>Your signed-in account is not an owner or manager of ${businessName}.</p>
-        <button type="button" id="legacyAdminSignOut">Sign out</button>
-      </main>
-    `
-    document.getElementById('legacyAdminSignOut').addEventListener('click', async () => {
-      await supabase.auth.signOut()
-      window.location.reload()
-    })
-    return false
-  }
-
-  return true
-}
-
-async function loadBranding() {
-  const { data, error } = await supabase
-    .from('restaurant_branding')
-    .select('*')
-    .eq('business_id', currentBusinessId)
-    .single()
-
-  if (error) {
-    console.error('Could not load branding:', error)
-    return {
-      restaurant_name: 'Dim Sum Dragon',
-      logo_url: '',
-      primary_color: '#b32626',
-      background_start: '#fff8ef',
-      background_end: '#f1dfcf'
-    }
-  }
-
-  document.documentElement.style.setProperty('--primary-color', data.primary_color)
-  document.documentElement.style.setProperty('--primary-dark-color', data.primary_color)
-  document.documentElement.style.setProperty('--background-start', data.background_start)
-  document.documentElement.style.setProperty('--background-end', data.background_end)
-
-  return data
-}
-
-async function loadRestaurantSettings() {
-  const { data, error } = await supabase
-    .from('restaurant_settings')
-    .select('*')
-    .eq('business_id', currentBusinessId)
-    .single()
-
-  if (error) {
-    console.error('Could not load restaurant settings:', error)
-
-    return {
-      opening_time: '11:00',
-      closing_time: '22:00',
-      max_guests_per_slot: 20,
-      default_duration_minutes: 90
-    }
-  }
-
-  return data
-}
-
-async function loadBusinessProfile() {
-  const { data, error } = await supabase
-    .from('business_profile')
-    .select('*')
-    .eq('business_id', currentBusinessId)
-    .single()
-
-  if (error) {
-    console.error('Could not load business profile:', error)
-
-    return {
-      business_name: 'Dim Sum Dragon',
-      business_type: 'restaurant',
+  return {
+    business,
+    profile: profile || {
+      business_name: business.business_name,
       booking_label: 'Reservation',
       customer_label: 'Customer',
-      capacity_label: 'Guests'
-    }
+      capacity_label: 'Guests',
+      uses_capacity: true
+    },
+    branding: branding || {},
+    settings: settings || {}
   }
-
-  return data
 }
 
-async function loadBusinesses() {
-  const { data, error } = await supabase
-    .from('businesses')
-    .select('*')
-    .order('business_name')
-
-  if (error) {
-    console.error(error)
-    return []
+function renderStatus(status) {
+  const labels = {
+    confirmed: 'Confirmed',
+    cancelled: 'Cancelled',
+    completed: 'Completed',
+    no_show: 'No Show'
   }
-
-  return data
+  return labels[status] || status || 'Unknown'
 }
 
-async function loadCustomFields() {
-  const { data, error } = await supabase
-    .from('booking_custom_fields')
-    .select('*')
-    .eq('business_id', currentBusinessId)
-    .eq('is_active', true)
-    .order('display_order', { ascending: true })
-
-  if (error) {
-    console.error('Could not load custom fields:', error)
-    return []
-  }
-
-  return data
-}
-
-const currentBusiness = await loadCurrentBusiness()
-
-if (pageRoute === '/') {
-  const profile = await loadBusinessProfile()
-  const branding = await loadBranding()
-  const customFields = await loadCustomFields()
+async function renderBookings(context) {
+  const canManage = hasCapability('manageBookings')
+  const today = new Date().toISOString().split('T')[0]
 
   document.querySelector('#app').innerHTML = `
-  ${branding.logo_url ? `<img src="${branding.logo_url}" class="brand-logo" />` : ''}
-  <h1>${profile.business_name} ${profile.booking_label}s</h1>
+    <main class="legacy-reservations-management">
+      <h1>${escapeHtml(context.profile.business_name)} Reservations</h1>
+      ${renderNav('bookings')}
 
-  <form id="reservationForm">
-    <input type="text" 
-    id="name" 
-    placeholder="${profile.customer_label} 
-    Name" required />
-    <br /><br />
+      <div class="analytics-filter-panel">
+        <label>Start Date<input type="date" id="adminStartDateFilter" value="${today}"></label>
+        <label>End Date<input type="date" id="adminEndDateFilter" value="${today}"></label>
+        <button id="loadDateButton" type="button">Load Date Range</button>
+      </div>
 
-    <input type="text" 
-    id="phone" 
-    placeholder="Phone Number" 
-    required />
-    <br /><br />
+      <div>
+        <input id="searchReference" type="text" placeholder="Search by reference number">
+        <button id="searchButton" type="button">Search</button>
+        <button id="refreshButton" type="button">Show All ${escapeHtml(context.profile.booking_label)}s</button>
+      </div>
 
-    <input type="date" 
-    id="date" 
-    required />
-    <br /><br />
+      <div>
+        <button id="showActiveButton" type="button">Active</button>
+        <button id="showArchivedButton" type="button">Archived</button>
+        <button id="showAllButton" type="button">All</button>
+      </div>
 
-    <input type="time" 
-    id="time" 
-    required />
-    <br /><br />
-
-    ${
-  profile.uses_capacity
-    ? `
-      <input
-        type="number"
-        id="guests"
-        placeholder="Number of ${profile.capacity_label}"
-        required
-      />
-      <br /><br />
-    `
-    : ''
-}
-    
-    ${customFields.map((field) => {
-  if (field.field_type === 'textarea') {
-    return `
-      <textarea
-        id="custom-${field.id}"
-        placeholder="${field.field_label}"
-        ${field.is_required ? 'required' : ''}
-      ></textarea>
-      <br /><br />
-    `
-  }
-
-  if (field.field_type === 'checkbox') {
-    return `
-      <label>
-        <input
-          type="checkbox"
-          id="custom-${field.id}"
-        />
-        ${field.field_label}
-      </label>
-      <br /><br />
-    `
-  }
-
-  if (field.field_type === 'dropdown') {
-    const options = (field.field_options || '')
-      .split('\n')
-      .filter(option => option.trim() !== '')
-
-    return `
-      <label>${field.field_label}</label>
-      <select
-        id="custom-${field.id}"
-        ${field.is_required ? 'required' : ''}
-      >
-        <option value="">Select an option</option>
-        ${options.map(option => `
-          <option value="${option}">
-            ${option}
-          </option>
-        `).join('')}
-      </select>
-      <br /><br />
-    `
-  }
-
-  return `
-    <input
-      type="${field.field_type}"
-      id="custom-${field.id}"
-      placeholder="${field.field_label}"
-      ${field.is_required ? 'required' : ''}
-    />
-    <br /><br />
-  `
-}).join('')}
-
-    <textarea id="request" placeholder="Special Requests"></textarea>
-    <br /><br />
-
-    <button type="submit">Create ${profile.booking_label}</button>
-  
-    <p style="font-size:12px; color:#666; margin-top:10px;">
-    By submitting this form, you agree that your details will be stored for booking management purposes.
-    </p>
-    </form>
-
-<hr>
-
-  <div id="message"></div>
-<hr>
-
-<h2>Cancel ${profile.booking_label}</h2>
-
-<form id="cancelForm">
-  <input
-    type="text"
-    id="cancelReference"
-    placeholder="${profile.booking_label} Reference"
-    required
-  />
-
-  <br /><br />
-
-  <input
-    type="text"
-    id="cancelPhone"
-    placeholder="Phone Number Used for Booking"
-    required
-  />
-
-  <br /><br />
-
-  <button type="submit">
-    Cancel ${profile.booking_label}
-  </button>
-</form>
-
-<div id="cancelMessage"></div>
-
-<hr>
-<h2>Reschedule ${profile.booking_label}</h2>
-<form id="rescheduleForm">
-  <input id="rescheduleReference" placeholder="${profile.booking_label} Reference" required />
-  <br /><br />
-  <input id="reschedulePhone" placeholder="Phone Number Used for Booking" required />
-  <br /><br />
-  <input id="rescheduleDate" type="date" required />
-  <br /><br />
-  <button id="loadRescheduleSlots" type="button">Show Available Times</button>
-  <select id="rescheduleTime" hidden required></select>
-  <button id="confirmReschedule" type="submit" hidden>Confirm New Time</button>
-</form>
-<div id="rescheduleMessage"></div>
-
-`
-
-const form = document.getElementById('reservationForm')
-const submitButton = form.querySelector('button[type="submit"]')
-const cancelForm = document.getElementById('cancelForm')
-const cancelButton = cancelForm.querySelector('button[type="submit"]')
-const rescheduleForm = document.getElementById('rescheduleForm')
-const loadRescheduleSlots = document.getElementById('loadRescheduleSlots')
-const rescheduleTime = document.getElementById('rescheduleTime')
-const confirmReschedule = document.getElementById('confirmReschedule')
-const rescheduleDate = document.getElementById('rescheduleDate')
-rescheduleDate.min = new Date().toISOString().split('T')[0]
-rescheduleDate.max = new Date(Date.now() + 730 * 86400000).toISOString().split('T')[0]
-
-async function checkAvailability(
-  reservation_date,
-  reservation_time,
-  requestedGuests
-) {
-  const { data, error } = await supabase.rpc('check_public_restaurant_availability', {
-    p_business_slug: currentBusinessSlug,
-    p_reservation_date: reservation_date,
-    p_reservation_time: normalizeTime(reservation_time),
-    p_party_size: requestedGuests
-  })
-
-  if (error) {
-    console.error(error)
-    return false
-  }
-
-  return data === true
-}
-
-function timeToMinutes(time) {
-  const [hours, minutes] = time.split(':').map(Number)
-  return hours * 60 + minutes
-}
-
-function minutesToTime(minutes) {
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
-}
-
-function normalizeTime(time) {
-  if (time.length === 5) {
-    return `${time}:00`
-  }
-
-  return time
-}
-
-async function findAvailableSlots(reservation_date, requested_time, party_size) {
-  const settings = await loadRestaurantSettings()
-
-  const closingTime = timeToMinutes(settings.closing_time)
-  const requestedMinutes = timeToMinutes(requested_time)
-
-  const availableSlots = []
-
-  for (
-    let minutes = requestedMinutes + 30;
-    minutes < closingTime;
-    minutes += 30
-  ) {
-    const slot = minutesToTime(minutes)
-
-    const available = await checkAvailability(
-      reservation_date,
-      slot,
-      party_size
-    )
-
-    if (available) {
-      availableSlots.push(slot)
-    }
-
-    if (availableSlots.length === 3) {
-      break
-    }
-  }
-
-  return availableSlots
-}
-
-async function generateReservationReference(reservation_date, profile) {
-  const dateCode = reservation_date.replaceAll('-', '')
-
-  const { data, error } = await supabase
-    .from('reservations')
-    .select('id')
-    .eq('business_id', currentBusinessId)
-    .eq('reservation_date', reservation_date)
-
-  if (error) {
-    console.error(error)
-  const prefix = profile.reference_prefix || 'REF'
-    return `${prefix}-${dateCode}-001`
-  }
-
-  const nextNumber = data.length + 1
-  const paddedNumber = String(nextNumber).padStart(3, '0')
-
-  const prefix = profile.reference_prefix || 'REF'
-
-  return `${prefix}-${dateCode}-${paddedNumber}` 
-}
-
-async function isWithinOpeningHours(reservation_time) {
-  const settings = await loadRestaurantSettings()
-
-  const openingTime = timeToMinutes(settings.opening_time)
-  const closingTime = timeToMinutes(settings.closing_time)
-  const requestedTime = timeToMinutes(reservation_time)
-
-  return requestedTime >= openingTime && requestedTime < closingTime
-}
-
-form.addEventListener('submit', async (e) => {
-  e.preventDefault()
-submitButton.disabled = true
-submitButton.textContent = 'Creating Reservation...'
-
-  const customer_name = document.getElementById('name').value
-  const phone = document.getElementById('phone').value
-  const reservation_date = document.getElementById('date').value
-  const reservation_time = document.getElementById('time').value
-  const party_size =
-    profile.uses_capacity
-      ? parseInt(document.getElementById('guests').value)
-      : 1
-  const special_request = document.getElementById('request').value
-if (!(await isWithinOpeningHours(reservation_time))) {
-  const message = document.getElementById('message')
-
-  message.innerHTML = `
-    <p style="color:red">
-      Sorry, reservations are only available from 11:00 AM to 10:00 PM.
-    </p>
+      <div id="dashboardSummary"></div>
+      <div id="adminReservations">Loading reservations...</div>
+    </main>
   `
 
-  submitButton.disabled = false
-  submitButton.textContent = 'Create Reservation'
+  const startInput = document.getElementById('adminStartDateFilter')
+  const endInput = document.getElementById('adminEndDateFilter')
+  const target = document.getElementById('adminReservations')
+  const summary = document.getElementById('dashboardSummary')
+  let viewMode = 'active'
 
-  return
-}
-
-const available =
-  await checkAvailability(
-    reservation_date,
-    reservation_time,
-    party_size
-  )
-
-if (!available) {
-  const alternativeSlots = await findAvailableSlots(
-    reservation_date,
-    reservation_time,
-    party_size
-  )
-
-  const message = document.getElementById('message')
-
-  if (alternativeSlots.length === 0) {
-    message.innerHTML = `
-      <p style="color:red">
-        Sorry, this time slot is fully booked and there are no later available slots today.
-      </p>
-    `
-  } else {
-    message.innerHTML = `
-      <p style="color:red">
-        Sorry, this time slot is fully booked.
-      </p>
-
-      <p>
-        Available later times:
-        <strong>${alternativeSlots.join(', ')}</strong>
-      </p>
+  function updateSummary(rows) {
+    const confirmed = rows.filter(row => row.status === 'confirmed')
+    const completed = rows.filter(row => row.status === 'completed')
+    const cancelled = rows.filter(row => row.status === 'cancelled')
+    const noShows = rows.filter(row => row.status === 'no_show')
+    const capacity = rows.reduce((sum, row) => sum + Number(row.party_size || 0), 0)
+    summary.innerHTML = `
+      <div class="summary-grid">
+        <div class="summary-card"><h3>${escapeHtml(context.profile.booking_label)}s</h3><p>${rows.length}</p></div>
+        <div class="summary-card"><h3>${escapeHtml(context.profile.capacity_label)}</h3><p>${capacity}</p></div>
+        <div class="summary-card"><h3>Confirmed</h3><p>${confirmed.length}</p></div>
+        <div class="summary-card"><h3>Completed</h3><p>${completed.length}</p></div>
+        <div class="summary-card"><h3>Cancelled</h3><p>${cancelled.length}</p></div>
+        <div class="summary-card"><h3>No Shows</h3><p>${noShows.length}</p></div>
+      </div>
     `
   }
 
-  submitButton.disabled = false
-  submitButton.textContent = 'Create Reservation'
-
-  return
-}
-
-const custom_data = {}
-
-customFields.forEach((field) => {
-  const customInput = document.getElementById(`custom-${field.id}`)
-
-custom_data[field.field_label] =
-  field.field_type === 'checkbox'
-    ? customInput.checked
-      ? 'Yes'
-      : 'No'
-    : customInput.value
-})
-
-  const { data: reservation_reference, error } = await supabase.rpc(
-    'create_public_restaurant_reservation',
-    {
-      p_business_slug: currentBusinessSlug,
-      p_customer_name: customer_name,
-      p_phone: phone,
-      p_reservation_date: reservation_date,
-      p_reservation_time: normalizeTime(reservation_time),
-      p_party_size: party_size,
-      p_special_request: special_request || null,
-      p_custom_data: custom_data
+  function renderRows(rows) {
+    updateSummary(rows)
+    if (!rows.length) {
+      target.innerHTML = '<p>No reservations found.</p>'
+      return
     }
-  )
 
-  const message = document.getElementById('message')
-
-  if (error) {
-    console.error(error)
-    message.innerHTML = `<p style="color:red">Reservation failed.</p>`
-
-    submitButton.disabled = false
-    submitButton.textContent = 'Create Reservation'
-
-    return
+    target.innerHTML = rows.map(row => `
+      <article class="entity-card" data-reservation-id="${row.id}">
+        <div>
+          <h3>${escapeHtml(row.reservation_reference || 'No reference')}</h3>
+          <p>${escapeHtml(row.customer_name || '')} · ${escapeHtml(row.phone || '')}</p>
+          <p>${escapeHtml(row.reservation_date || '')} ${escapeHtml(String(row.reservation_time || '').slice(0, 5))}</p>
+          <small>${escapeHtml(renderStatus(row.status))}${row.is_archived ? ' · Archived' : ''}</small>
+        </div>
+        ${canManage ? `
+          <div class="session-actions">
+            ${row.status === 'confirmed' ? `<button type="button" data-action="completed" data-id="${row.id}">Complete</button><button type="button" data-action="no_show" data-id="${row.id}">No show</button>` : ''}
+            ${row.is_archived ? `<button type="button" data-action="restore" data-id="${row.id}">Restore</button>` : `<button type="button" data-action="archive" data-id="${row.id}">Archive</button>`}
+          </div>
+        ` : ''}
+      </article>
+    `).join('')
   }
 
-  message.innerHTML = `
-  <p style="color:green">Reservation created successfully!</p>
-  <p>Your reservation reference is: <strong>${reservation_reference}</strong></p>
-`
+  async function loadRows(reference = '') {
+    let query = supabase.from('reservations').select('*')
+      .eq('business_id', businessId)
+      .order('reservation_date', { ascending: true })
+      .order('reservation_time', { ascending: true })
 
-  form.reset()
-  submitButton.disabled = false
-submitButton.textContent = 'Create Reservation'
-})
+    if (reference) {
+      query = query.eq('reservation_reference', reference)
+    } else {
+      query = query.gte('reservation_date', startInput.value).lte('reservation_date', endInput.value)
+      if (viewMode === 'active') query = query.eq('is_archived', false)
+      if (viewMode === 'archived') query = query.eq('is_archived', true)
+    }
 
-cancelForm.addEventListener('submit', async (e) => {
-  e.preventDefault()
+    const { data, error } = await query
+    if (error) {
+      target.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`
+      return
+    }
+    renderRows(data || [])
+  }
 
-  cancelButton.disabled = true
-  cancelButton.textContent = 'Cancelling...'
-
-  const reservation_reference = document
-    .getElementById('cancelReference')
-    .value
-    .trim()
-
-  const phone = document.getElementById('cancelPhone').value.trim()
-  const { data, error } = await supabase.rpc('cancel_public_restaurant_reservation', {
-    p_business_slug: currentBusinessSlug,
-    p_reservation_reference: reservation_reference,
-    p_phone: phone
+  target.addEventListener('click', async event => {
+    const button = event.target.closest('button[data-action]')
+    if (!button || !canManage) return
+    const id = Number(button.dataset.id)
+    const action = button.dataset.action
+    let mutation
+    if (action === 'completed' || action === 'no_show') {
+      mutation = supabase.from('reservations').update({ status: action }).eq('id', id)
+    } else if (action === 'archive') {
+      mutation = supabase.from('reservations').update({ is_archived: true }).eq('id', id)
+    } else if (action === 'restore') {
+      mutation = supabase.from('reservations').update({ is_archived: false }).eq('id', id)
+    }
+    if (!mutation) return
+    const { error } = await mutation
+    if (error) return window.alert(error.message)
+    await loadRows()
   })
 
-  const cancelMessage = document.getElementById('cancelMessage')
+  document.getElementById('loadDateButton').addEventListener('click', () => loadRows())
+  document.getElementById('refreshButton').addEventListener('click', () => loadRows())
+  document.getElementById('searchButton').addEventListener('click', () => loadRows(document.getElementById('searchReference').value.trim()))
+  document.getElementById('showActiveButton').addEventListener('click', () => { viewMode = 'active'; loadRows() })
+  document.getElementById('showArchivedButton').addEventListener('click', () => { viewMode = 'archived'; loadRows() })
+  document.getElementById('showAllButton').addEventListener('click', () => { viewMode = 'all'; loadRows() })
 
-  if (error) {
-    console.error(error)
-    cancelMessage.innerHTML = `
-      <p style="color:red">
-        Could not cancel reservation. Please try again.
-      </p>
-    `
-
-    cancelButton.disabled = false
-    cancelButton.textContent = 'Cancel Reservation'
-
-    return
-  }
-
-  if (data !== true) {
-    cancelMessage.innerHTML = `
-      <p style="color:red">
-        No active ${profile.booking_label.toLowerCase()} found with that reference number.
-      </p>
-    `
-
-    cancelButton.disabled = false
-    cancelButton.textContent = 'Cancel Reservation'
-
-    return
-  }
-
-  cancelMessage.innerHTML = `
-  <p style="color:green">
-    ${profile.booking_label} ${reservation_reference} has been cancelled.
-  </p>
-
-  `
-
-  cancelForm.reset()
-
-  cancelButton.disabled = false
-  cancelButton.textContent = 'Cancel Reservation'
-})
-
-loadRescheduleSlots.addEventListener('click', async () => {
-  const reference = document.getElementById('rescheduleReference').value.trim()
-  const phone = document.getElementById('reschedulePhone').value.trim()
-  const message = document.getElementById('rescheduleMessage')
-  if (!reference || !phone || !rescheduleDate.value) {
-    message.innerHTML = '<p style="color:red">Enter your reference, phone number and preferred date.</p>'
-    return
-  }
-  loadRescheduleSlots.disabled = true
-  message.textContent = 'Checking available times...'
-  const { data, error } = await supabase.rpc('get_public_restaurant_reschedule_slots', {
-    p_business_slug: currentBusinessSlug,
-    p_reservation_reference: reference,
-    p_phone: phone,
-    p_local_date: rescheduleDate.value
-  })
-  loadRescheduleSlots.disabled = false
-  if (error || !data?.length) {
-    rescheduleTime.hidden = true
-    confirmReschedule.hidden = true
-    message.innerHTML = '<p style="color:red">No available times found. Check your details or choose another date.</p>'
-    return
-  }
-  rescheduleTime.innerHTML = data.map(row => '<option value="' + row.reservation_time + '">' + row.reservation_time.slice(0, 5) + '</option>').join('')
-  rescheduleTime.hidden = false
-  confirmReschedule.hidden = false
-  message.textContent = 'Choose a new time and confirm.'
-})
-
-rescheduleForm.addEventListener('submit', async (e) => {
-  e.preventDefault()
-  confirmReschedule.disabled = true
-  const { data, error } = await supabase.rpc('reschedule_public_restaurant_reservation', {
-    p_business_slug: currentBusinessSlug,
-    p_reservation_reference: document.getElementById('rescheduleReference').value.trim(),
-    p_phone: document.getElementById('reschedulePhone').value.trim(),
-    p_new_date: rescheduleDate.value,
-    p_new_time: rescheduleTime.value
-  })
-  confirmReschedule.disabled = false
-  const message = document.getElementById('rescheduleMessage')
-  if (error || data !== true) {
-    message.innerHTML = '<p style="color:red">Could not reschedule. The time may have just been taken.</p>'
-    return
-  }
-  message.innerHTML = '<p style="color:green">Your new reservation time is confirmed.</p>'
-  rescheduleTime.hidden = true
-  confirmReschedule.hidden = true
-})
-
+  await loadRows()
 }
 
-if (pageRoute === '/admin') {
-  const branding = await loadBranding()
-  const profile = await loadBusinessProfile()
-  const businesses = await loadBusinesses()
+async function renderAnalytics(context) {
+  if (!hasCapability('viewAnalytics')) {
+    document.querySelector('#app').innerHTML = `<main><h1>Analytics</h1>${renderNav('analytics')}<p>This role does not have access to Reservations analytics.</p></main>`
+    return
+  }
 
-  if (!(await requireAdminAccess(profile.business_name))) {
-  // The sign-in or access message is rendered by requireAdminAccess.
-} else {
+  const today = new Date().toISOString().split('T')[0]
   document.querySelector('#app').innerHTML = `
-  ${branding.logo_url ? `<img src="${branding.logo_url}" class="brand-logo" />` : ''}
-  <h1>${profile.business_name} Admin Dashboard</h1>
-
-<select id="businessSwitcher">
-  ${businesses.map(business => `
-    <option
-      value="${business.business_slug}"
-      ${business.business_slug === currentBusinessSlug
-        ? 'selected'
-        : ''}
-    >
-      ${business.business_name}
-    </option>
-  `).join('')}
-</select>
-
-  <div class="admin-nav">
-  <a href="/${currentBusinessSlug}/admin">Dashboard</a>
-  <a href="/${currentBusinessSlug}/admin/analytics">Analytics</a>
-  <a href="/${currentBusinessSlug}/admin/settings">Settings</a>
-</div>
-
-    <input 
-  type="text" 
-  id="searchReference" 
-  placeholder="Search by reference number"
-/>
-
-<button id="searchButton">Search</button>
-
-<button id="refreshButton">
-  Show All ${profile.booking_label}s
-</button>
-<br /><br />
-
-<label>Start Date</label>
-<input type="date" id="adminStartDateFilter" />
-
-<label>End Date</label>
-<input type="date" id="adminEndDateFilter" />
-
-<button id="loadDateButton">Load Date Range</button>
-<br /><br />
-
-<label>View</label>
-<button id="showActiveButton">Active</button>
-<button id="showArchivedButton">Archived</button>
-<button id="showAllButton">All</button>
-
-<hr>
-
-<div id="dashboardSummary"></div>
-
-<hr>
-
-<div id="adminReservations">Loading reservations...</div>
+    <main class="legacy-reservations-management">
+      <h1>${escapeHtml(context.profile.business_name)} Analytics</h1>
+      ${renderNav('analytics')}
+      <label>Start Date<input type="date" id="analyticsStartDate" value="${today}"></label>
+      <label>End Date<input type="date" id="analyticsEndDate" value="${today}"></label>
+      <button id="loadAnalyticsButton" type="button">Load Analytics</button>
+      <div id="analyticsResults"></div>
+    </main>
   `
 
-const refreshButton = document.getElementById('refreshButton')
-const searchButton = document.getElementById('searchButton')
-const searchReference = document.getElementById('searchReference')
-const adminReservations = document.getElementById('adminReservations')
-const dashboardSummary = document.getElementById('dashboardSummary')
-const adminStartDateFilter = document.getElementById('adminStartDateFilter')
-const adminEndDateFilter = document.getElementById('adminEndDateFilter')
-const loadDateButton = document.getElementById('loadDateButton')
-const showActiveButton = document.getElementById('showActiveButton')
-const showArchivedButton = document.getElementById('showArchivedButton')
-const showAllButton = document.getElementById('showAllButton')
-const businessSwitcher = document.getElementById('businessSwitcher')
-
-let selectedAdminStartDate = new Date().toISOString().split('T')[0]
-let selectedAdminEndDate = selectedAdminStartDate
-
-adminStartDateFilter.value = selectedAdminStartDate
-adminEndDateFilter.value = selectedAdminEndDate
-
-let adminViewMode = 'active'
-
-async function markReservationCompleted(reservationId) {
-  const { error } = await supabase
-    .from('reservations')
-    .update({ status: 'completed' })
-    .eq('id', reservationId)
-
-  if (error) {
-    console.error(error)
-    alert('Could not mark reservation as completed.')
-    return
-  }
-
-  loadAdminReservations()
-}
-
-function updateDashboardSummary(reservations) {
-  const selectedReservations = reservations
-
-  const confirmed = selectedReservations.filter(
-    reservation => reservation.status === 'confirmed'
-  )
-
-  const cancelled = selectedReservations.filter(
-    reservation => reservation.status === 'cancelled'
-  )
-
-  const completed = selectedReservations.filter(
-    reservation => reservation.status === 'completed'
-  )
-
-  const noShows = selectedReservations.filter(
-    reservation => reservation.status === 'no_show'
-  )
-
-  const totalCapacityUnits = confirmed.reduce(
-  (total, reservation) => total + reservation.party_size,
-  0
-)
-
-  dashboardSummary.innerHTML = `
-    <div class="summary-grid">
-      <div class="summary-card">
-        <h3>${profile.booking_label}s</h3>
-        <p>${selectedReservations.length}</p>
+  async function loadAnalytics() {
+    const { data, error } = await supabase.from('reservations').select('*')
+      .eq('business_id', businessId)
+      .gte('reservation_date', document.getElementById('analyticsStartDate').value)
+      .lte('reservation_date', document.getElementById('analyticsEndDate').value)
+    const target = document.getElementById('analyticsResults')
+    if (error) {
+      target.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`
+      return
+    }
+    const rows = data || []
+    const count = status => rows.filter(row => row.status === status).length
+    const capacity = rows.reduce((sum, row) => sum + Number(row.party_size || 0), 0)
+    target.innerHTML = `
+      <div class="summary-grid">
+        <div class="summary-card"><h3>Total ${escapeHtml(context.profile.booking_label)}s</h3><p>${rows.length}</p></div>
+        <div class="summary-card"><h3>${escapeHtml(context.profile.capacity_label)}</h3><p>${capacity}</p></div>
+        <div class="summary-card"><h3>Confirmed</h3><p>${count('confirmed')}</p></div>
+        <div class="summary-card"><h3>Completed</h3><p>${count('completed')}</p></div>
+        <div class="summary-card"><h3>Cancelled</h3><p>${count('cancelled')}</p></div>
+        <div class="summary-card"><h3>No Shows</h3><p>${count('no_show')}</p></div>
       </div>
-
-      <div class="summary-card">
-        <h3>${profile.capacity_label}</h3>
-        <p>${totalCapacityUnits}</p>
-      </div>
-
-      <div class="summary-card">
-        <h3>Confirmed</h3>
-        <p>${confirmed.length}</p>
-      </div>
-
-      <div class="summary-card">
-        <h3>Completed</h3>
-        <p>${completed.length}</p>
-      </div>
-
-      <div class="summary-card">
-        <h3>Cancelled</h3>
-        <p>${cancelled.length}</p>
-      </div>
-
-      <div class="summary-card">
-        <h3>No Shows</h3>
-        <p>${noShows.length}</p>
-      </div>
-    </div>
-  `
-}
-
-async function markReservationNoShow(reservationId) {
-  const { error } = await supabase
-    .from('reservations')
-    .update({ status: 'no_show' })
-    .eq('id', reservationId)
-
-  if (error) {
-    console.error(error)
-    alert('Could not mark reservation as no show.')
-    return
-  }
-
-  loadAdminReservations()
-}
-
-async function archiveReservation(reservationId) {
-  console.log('ARCHIVING ID:', reservationId)
-
-  const { error } = await supabase
-    .from('reservations')
-    .update({ is_archived: true })
-    .eq('id', reservationId)
-
-  if (error) {
-    console.error(error)
-    alert('Could not archive reservation.')
-    return
-  }
-
-    loadAdminReservations()
-}
-  async function restoreReservation(reservationId) {
-  const { error } = await supabase
-    .from('reservations')
-    .update({ is_archived: false })
-    .eq('id', reservationId)
-
-  if (error) {
-    console.error(error)
-    alert('Could not restore reservation.')
-    return
-  }
-
-  loadAdminReservations()
-}
-
-async function deleteReservation(reservationId) {
-  const deletePassword = import.meta.env.VITE_DELETE_PASSWORD
-  const enteredPassword = prompt('Enter manager delete password:')
-
-  if (enteredPassword !== deletePassword) {
-    alert('Delete cancelled. Incorrect password.')
-    return
-  }
-
-  const confirmDelete = confirm(
-    'This will permanently delete the reservation. Are you sure?'
-  )
-
-  if (!confirmDelete) {
-    return
-  }
-
-  const { error } = await supabase
-    .from('reservations')
-    .delete()
-    .eq('id', reservationId)
-
-  if (error) {
-    console.error(error)
-    alert('Could not delete reservation.')
-    return
-  }
-
-  loadAdminReservations()
-}
-
-async function loadAdminReservations() {
-  let query = supabase
-  .from('reservations')
-  .select('*')
-  .eq('business_id', currentBusinessId)
-  .gte('reservation_date', selectedAdminStartDate)
-  .lte('reservation_date', selectedAdminEndDate)
-  .order('reservation_time', { ascending: true })
-
-if (adminViewMode === 'active') {
-  query = query.eq('is_archived', false)
-}
-
-if (adminViewMode === 'archived') {
-  query = query.eq('is_archived', true)
-}
-
-const { data, error } = await query
-
-  if (error) {
-    console.error(error)
-    adminReservations.innerHTML = `
-      <p style="color:red">Could not load reservations.</p>
     `
-    return
   }
 
-  if (data.length === 0) {
-    adminReservations.innerHTML = '<p>No reservations found.</p>'
-    updateDashboardSummary([])
-    return
-  }
-
-  updateDashboardSummary(data)
-
-  adminReservations.innerHTML = data.map((reservation) => `
-    <div style="border:1px solid #ccc; padding:12px; margin-bottom:10px; border-radius:8px;">
-      <strong>${reservation.reservation_reference || 'No reference'}</strong><br>
-      Name: ${reservation.customer_name}<br>
-      Phone: ${reservation.phone}<br>
-      Date: ${reservation.reservation_date}<br>
-      Time: ${reservation.reservation_time}<br>
-      Guests: ${reservation.party_size}<br>
-      Status:
-      ${
-        reservation.status === 'confirmed'
-          ? '<span style="color:green;font-weight:bold;">Confirmed</span>'
-          : reservation.status === 'cancelled'
-          ? '<span style="color:red;font-weight:bold;">Cancelled</span>'
-          : reservation.status === 'completed'
-          ? '<span style="color:blue;font-weight:bold;">Completed</span>'
-          : reservation.status === 'no_show'
-          ? '<span style="color:orange;font-weight:bold;">No Show</span>'
-          : reservation.status
-      }
-
-      ${
-           reservation.is_archived
-            ? '<span style="color:gray;font-weight:bold;">Archived</span><br>'
-            : ''
-      }
-      <br>
-      Request: ${reservation.special_request || 'None'}<br>
-
-${renderCustomData(reservation.custom_data)}
-
-<br><br>
-
-      ${
-        !reservation.is_archived
-          ? `
-            ${
-              reservation.status === 'confirmed'
-                ? `
-                  <button class="complete-button" data-id="${reservation.id}">
-                    Mark Arrived / Completed
-                  </button>
-
-                  <button class="noshow-button" data-id="${reservation.id}">
-                    Mark No Show
-                  </button>
-                `
-                : ''
-            }
-
-            <button class="archive-button" data-id="${reservation.id}">
-              Archive
-            </button>
-          `
-          : ''
-      }
-
-      ${
-  reservation.is_archived
-    ? `
-      <button class="restore-button" data-id="${reservation.id}">
-        Restore
-      </button>
-    `
-    : ''
+  document.getElementById('loadAnalyticsButton').addEventListener('click', loadAnalytics)
+  await loadAnalytics()
 }
 
-<button class="delete-button" data-id="${reservation.id}">
-  Manager Delete
-</button>
-
-    </div>
-  `).join('')
-}
-
-async function searchReservationByReference() {
-  const reference = searchReference.value.trim()
-
-  if (!reference) {
-    adminReservations.innerHTML = `
-      <p style="color:red">Please enter a reservation reference.</p>
-    `
-    return
-  }
-
-  const { data, error } = await supabase
-  .from('reservations')
-  .select('*')
-  .eq('business_id', currentBusinessId)
-  .eq('reservation_reference', reference)
-
-  if (error) {
-    console.error(error)
-    adminReservations.innerHTML = `
-      <p style="color:red">Search failed.</p>
-    `
-    return
-  }
-
-  if (data.length === 0) {
-    adminReservations.innerHTML = `
-      <p>No reservation found for reference: <strong>${reference}</strong></p>
-    `
-    return
-  }
-
-  adminReservations.innerHTML = data.map((reservation) => `
-    <div style="border:1px solid #ccc; padding:12px; margin-bottom:10px; border-radius:8px;">
-      <strong>${reservation.reservation_reference || 'No reference'}</strong><br>
-      Name: ${reservation.customer_name}<br>
-      Phone: ${reservation.phone}<br>
-      Date: ${reservation.reservation_date}<br>
-      Time: ${reservation.reservation_time}<br>
-      Guests: ${reservation.party_size}<br>
-      Status:
-${
-  reservation.status === 'confirmed'
-    ? '<span style="color:green;font-weight:bold;">Confirmed</span>'
-    : reservation.status === 'cancelled'
-    ? '<span style="color:red;font-weight:bold;">Cancelled</span>'
-    : reservation.status === 'completed'
-    ? '<span style="color:blue;font-weight:bold;">Completed</span>'
-    : reservation.status === 'no_show'
-    ? '<span style="color:orange;font-weight:bold;">No Show</span>'
-    : reservation.status
-}
-<br>
-
-${
-  reservation.is_archived
-    ? '<span style="color:gray;font-weight:bold;">Archived</span><br>'
-    : ''
-}
-      <br>
-      Request: ${reservation.special_request || 'None'}<br>
-
-${renderCustomData(reservation.custom_data)}
-
-<br><br>
-
-      ${
-        !reservation.is_archived
-          ? `
-            ${
-              reservation.status === 'confirmed'
-                ? `
-                  <button class="complete-button" data-id="${reservation.id}">
-                    Mark Arrived / Completed
-                  </button>
-
-                  <button class="noshow-button" data-id="${reservation.id}">
-                    Mark No Show
-                  </button>
-                `
-                : ''
-            }
-
-            <button class="archive-button" data-id="${reservation.id}">
-              Archive
-            </button>
-          `
-          : ''
-      }
-    </div>
-  `).join('')
-}
-
-adminReservations.addEventListener('click', async (e) => {
-
-  if (e.target.classList.contains('complete-button')) {
-    const reservationId = e.target.dataset.id
-    await markReservationCompleted(reservationId)
-  }
-
-  if (e.target.classList.contains('noshow-button')) {
-    const reservationId = e.target.dataset.id
-    await markReservationNoShow(reservationId)
-  }
-
-if (e.target.classList.contains('archive-button')) {
-  const reservationId = e.target.dataset.id
-  await archiveReservation(reservationId)
-}
-
-if (e.target.classList.contains('restore-button')) {
-  const reservationId = e.target.dataset.id
-  await restoreReservation(reservationId)
-}
-
-if (e.target.classList.contains('delete-button')) {
-  const reservationId = e.target.dataset.id
-  await deleteReservation(reservationId)
-}
-
-})
-
-  refreshButton.addEventListener('click', loadAdminReservations)
-  searchButton.addEventListener('click', searchReservationByReference)
-
-  loadDateButton.addEventListener('click', () => {
-  selectedAdminStartDate = adminStartDateFilter.value
-  selectedAdminEndDate = adminEndDateFilter.value
-
-  loadAdminReservations()
-})
-
-showActiveButton.addEventListener('click', () => {
-  adminViewMode = 'active'
-  loadAdminReservations()
-})
-
-showArchivedButton.addEventListener('click', () => {
-  adminViewMode = 'archived'
-  loadAdminReservations()
-})
-
-showAllButton.addEventListener('click', () => {
-  adminViewMode = 'all'
-  loadAdminReservations()
-})
-
-if (businessSwitcher) {
-  businessSwitcher.addEventListener('change', () => {
-    const selectedSlug = businessSwitcher.value
-
-    window.location.href =
-      `/${selectedSlug}/admin`
-  })
-}
-
-function renderCustomData(customData) {
-  if (!customData) {
-    return ''
-  }
-
-  return Object.entries(customData)
-    .map(([key, value]) => key + ': ' + value)
-    .join('<br>')
-}
-
-  loadAdminReservations()
-}
-}
-
-
-if (pageRoute === '/admin/settings') {
-  const branding = await loadBranding()
-  const profile = await loadBusinessProfile()
-  const businesses = await loadBusinesses()
-
-  const { data: settings } = await supabase
-    .from('restaurant_settings')
-    .select('*')
-    .eq('business_id', currentBusinessId)
-    .single()
-if (!(await requireAdminAccess(profile.business_name))) {
-    // The sign-in or access message is rendered by requireAdminAccess.
-  } else {
-    document.querySelector('#app').innerHTML = `
-      ${branding.logo_url ? `<img src="${branding.logo_url}" class="brand-logo" />` : ''}
-      <h1>${branding.restaurant_name} Settings</h1>
-
-<select id="businessSwitcher">
-  ${businesses.map(business => `
-    <option
-      value="${business.business_slug}"
-      ${business.business_slug === currentBusinessSlug
-        ? 'selected'
-        : ''}
-    >
-      ${business.business_name}
-    </option>
-  `).join('')}
-</select>
-
-<br /><br />
-
-      <div class="admin-nav">
-        <a href="/${currentBusinessSlug}/admin">Dashboard</a>
-        <a href="/${currentBusinessSlug}/admin/analytics">Analytics</a>
-        <a href="/${currentBusinessSlug}/admin/settings">Settings</a>
-      </div>
-      
-      <div class="settings-tabs">
-        <button id="businessTabButton" type="button">Business</button>
-        <button id="operationsTabButton" type="button">Operations</button>
-        <button id="brandingTabButton" type="button">Branding</button>
-      </div>
-      
-      <div id="businessSettingsSection">
-      <form id="businessProfileForm">
-        <h2>Business Profile</h2>
-
-      <input type="text" 
-        id="businessName" 
-        value="${profile.business_name}" 
-        placeholder="Business Name" 
-      />
-      <br /><br />
-
-      <label>Reference Prefix</label>
-        <input
-        type="text"
-        id="referencePrefix"
-        value="${profile.reference_prefix || ''}"
-        placeholder="DSD, MBP, SALON, SPA"
-        maxlength="6"
-        style="text-transform:uppercase;" 
-      />
-      <br /><br />
-
-      <label>Business Type</label>
-        <input type="text" 
-        id="businessType" 
-        value="${profile.business_type}" 
-        placeholder="restaurant, salon, physiotherapy" 
-      />
-      <br /><br />
-
-      <label>Industry Template</label>
-
-        <select id="industryTemplate">
-          <option value="restaurant"
-            ${profile.industry_template === 'restaurant' ? 'selected' : ''}>
-            Restaurant
-          </option>
-
-          <option value="salon"
-            ${profile.industry_template === 'salon' ? 'selected' : ''}>
-            Salon
-          </option>
-
-          <option value="physiotherapy"
-            ${profile.industry_template === 'physiotherapy' ? 'selected' : ''}>
-            Physiotherapy
-          </option>
-
-          <option value="general"
-            ${profile.industry_template === 'general' ? 'selected' : ''}>
-            General Appointment
-          </option>
-        </select>
-
-        <br /><br />
-
-        <label>Booking Label</label>
-        <input type="text" 
-        id="bookingLabel" 
-        value="${profile.booking_label}" 
-        placeholder="Reservation, Booking, Appointment" />
-        <br /><br />
-
-        <label>Customer Label</label>
-        <input type="text" 
-        id="customerLabel" 
-        value="${profile.customer_label}" 
-        placeholder="Customer, Client, Patient" />
-        <br /><br />
-
-        <label>Capacity Label</label>
-        <input type="text" 
-        id="capacityLabel" 
-        value="${profile.capacity_label}" 
-        placeholder="Guests, Clients, Patients" />
-        <br /><br />
-
-        <label>
-        <input type="checkbox"
-         id="usesCapacity"
-         ${profile.uses_capacity ? 'checked' : ''}
-        />
-        Allow Group Bookings
-        </label>
-
-        <br /><br />
-
-        <button type="submit">Save Business Profile</button>
-
-        <button
-          type="button"
-          id="applyTemplateButton"
-        >
-          Apply Industry Template
-        </button>
-
-      </form>
-
-      <form id="customFieldForm">
-  <h2>Custom Booking Fields</h2>
-
-  <input type="text" 
-  id="customFieldLabel" 
-  placeholder="Field Label" />
-  <br /><br />
-
-  <label>Field Type</label>
-  <select id="customFieldType">
-  <option value="text">Text</option>
-  <option value="number">Number</option>
-  <option value="date">Date</option>
-  <option value="time">Time</option>
-  <option value="textarea">Long Text</option>
-  <option value="checkbox">Checkbox</option>
-  <option value="dropdown">Dropdown</option>
-</select>
-  <br /><br />
-
-  <textarea
-  id="customFieldOptions"
-  placeholder="Dropdown options, one per line. Example:&#10;1 - Lowest&#10;2&#10;3&#10;10 - Highest"
-></textarea>
-<br /><br />
-
-<button type="button" id="scaleOptionsButton">
-  Use 1-10 Scale
-</button>
-
-<br /><br />
-
-  <label>
-    <input type="checkbox" id="customFieldRequired" />
-    Required field
-  </label>
-  <br /><br />
-
-  <button type="submit">Add Custom Field</button>
-</form>
-
-  <div id="customFieldsList"></div>
-</div>
-
-      <div id="operationsSettingsSection" style="display:none;">
-      <form id="operationalSettingsForm">
-        <h2>Operational Settings</h2>
-
-        <label>Opening Time</label>
-        <input
-          type="time"
-          id="openingTime"
-          value="${settings.opening_time}"
-        />
-        <br /><br />
-
-        <label>Closing Time</label>
-        <input
-          type="time"
-          id="closingTime"
-          value="${settings.closing_time}"
-        />
-        <br /><br />
-
-        <label>Maximum Guests Per Slot</label>
-        <input
-          type="number"
-          id="maxGuestsPerSlot"
-          value="${settings.max_guests_per_slot}"
-        />
-        <br /><br />
-
-        <label>Default Reservation Duration (minutes)</label>
-        <input
-          type="number"
-          id="defaultDurationMinutes"
-          value="${settings.default_duration_minutes}"
-        />
-        <br /><br />
-
-        <button type="submit">
-          Save Operational Settings
-        </button>
-      </form> 
-      </div>
-
-      <div id="brandingSettingsSection" style="display:none;">
-      <form id="brandingForm">
-        <h2>Brand Settings</h2>
-
-        <input type="text" 
-        id="restaurantName" 
-        value="${branding.restaurant_name}" 
-        placeholder="Restaurant Name" />
-        <br /><br />
-
-        <label>Primary Color</label>
-        <input type="color" 
-        id="primaryColor" 
-        value="${branding.primary_color}" />
-        <br /><br />
-
-        <label>Background Start</label>
-        <input type="color" 
-        id="backgroundStart" 
-        value="${branding.background_start}" />
-        <br /><br />
-
-        <label>Background End</label>
-        <input type="color" 
-        id="backgroundEnd" 
-        value="${branding.background_end}" />
-        <br /><br />
-
-        <button type="submit">Save Brand Settings</button>
-      </form>
-
-       <form id="logoForm">
-        <h2>Logo Upload</h2>
-
-        <input type="file" id="logoUpload" accept="image/*" />
-        <br /><br />
-
-        <button type="submit">Upload Logo</button>
-      </form>
-
-       </div>
-
+async function renderSettings(context) {
+  const canManage = hasCapability('manageSettings')
+  const profile = context.profile
+  const settings = context.settings
+  const branding = context.branding
+
+  document.querySelector('#app').innerHTML = `
+    <main class="legacy-reservations-management">
+      <h1>${escapeHtml(profile.business_name)} Settings</h1>
+      ${renderNav('settings')}
+      ${canManage ? '' : '<p class="read-only-notice">Settings are read-only for this TerraPeak role.</p>'}
+
+      <section id="businessSettingsSection" class="panel">
+        <h2>Business profile</h2>
+        <form id="businessProfileForm">
+          <label>Business name<input id="businessName" value="${escapeHtml(profile.business_name || '')}" ${canManage ? '' : 'disabled'}></label>
+          <label>Booking label<input id="bookingLabel" value="${escapeHtml(profile.booking_label || 'Reservation')}" ${canManage ? '' : 'disabled'}></label>
+          <label>Customer label<input id="customerLabel" value="${escapeHtml(profile.customer_label || 'Customer')}" ${canManage ? '' : 'disabled'}></label>
+          <label>Capacity label<input id="capacityLabel" value="${escapeHtml(profile.capacity_label || 'Guests')}" ${canManage ? '' : 'disabled'}></label>
+          <label><input type="checkbox" id="usesCapacity" ${profile.uses_capacity ? 'checked' : ''} ${canManage ? '' : 'disabled'}> Allow group bookings</label>
+          ${canManage ? '<button type="submit">Save Business Profile</button>' : ''}
+        </form>
+      </section>
+
+      <section id="operationsSettingsSection" class="panel">
+        <h2>Operational settings</h2>
+        <form id="operationalSettingsForm">
+          <label>Opening time<input type="time" id="openingTime" value="${escapeHtml(settings.opening_time || '09:00')}" ${canManage ? '' : 'disabled'}></label>
+          <label>Closing time<input type="time" id="closingTime" value="${escapeHtml(settings.closing_time || '17:00')}" ${canManage ? '' : 'disabled'}></label>
+          <label>Maximum guests per slot<input type="number" id="maxGuestsPerSlot" value="${Number(settings.max_guests_per_slot || 1)}" ${canManage ? '' : 'disabled'}></label>
+          <label>Default duration<input type="number" id="defaultDurationMinutes" value="${Number(settings.default_duration_minutes || 60)}" ${canManage ? '' : 'disabled'}></label>
+          ${canManage ? '<button type="submit">Save Operational Settings</button>' : ''}
+        </form>
+      </section>
+
+      <section id="brandingSettingsSection" class="panel">
+        <h2>Brand settings</h2>
+        <form id="brandingForm">
+          <label>Display name<input id="restaurantName" value="${escapeHtml(branding.restaurant_name || profile.business_name || '')}" ${canManage ? '' : 'disabled'}></label>
+          <label>Primary color<input type="color" id="primaryColor" value="${escapeHtml(branding.primary_color || '#2f5d50')}" ${canManage ? '' : 'disabled'}></label>
+          ${canManage ? '<button type="submit">Save Brand Settings</button>' : ''}
+        </form>
+      </section>
 
       <div id="brandingMessage"></div>
-    
-      `
-
-    const businessProfileForm = document.getElementById('businessProfileForm')
-    const brandingForm = document.getElementById('brandingForm')
-    const logoForm = document.getElementById('logoForm')
-    const brandingMessage = document.getElementById('brandingMessage')
-    const operationalSettingsForm = document.getElementById('operationalSettingsForm')
-    const customFieldForm = document.getElementById('customFieldForm')
-    const scaleOptionsButton = document.getElementById('scaleOptionsButton')
-    const customFieldsList = document.getElementById('customFieldsList')
-    const applyTemplateButton = document.getElementById('applyTemplateButton')
-    const businessTabButton = document.getElementById('businessTabButton')
-    const operationsTabButton = document.getElementById('operationsTabButton')
-    const brandingTabButton = document.getElementById('brandingTabButton')
-    const businessSwitcher = document.getElementById('businessSwitcher')
-    const businessSettingsSection = document.getElementById('businessSettingsSection')
-    const operationsSettingsSection = document.getElementById('operationsSettingsSection')
-    const brandingSettingsSection = document.getElementById('brandingSettingsSection')
-
-    async function applyIndustryTemplate(template) {
-      const templates = {
-        restaurant: [
-          'Occasion',
-          'Allergies',
-          'Seating Preference'
-        ],
-
-        salon: [
-          'Service Type',
-          'Preferred Stylist',
-          'Hair Length'
-        ],
-
-        physiotherapy: [
-          'Main Concern',
-          'First Visit',
-          'Preferred Therapist'
-        ],
-
-        general: []
-      }
-
-      await supabase
-        .from('booking_custom_fields')
-        .update({ is_active: false })
-        .eq('business_id', currentBusinessId)
-        .eq('is_active', true)
-
-      const fields = templates[template] || []
-
-      for (let i = 0; i < fields.length; i++) {
-        await supabase
-          .from('booking_custom_fields')
-           .insert([
-            {
-              business_id: currentBusinessId,
-              field_label: fields[i],
-              field_type: 'text',
-              is_required: false,
-              display_order: i + 1,
-              is_active: true
-            }
-          ])
-  }
-
-  loadCustomFieldsList()
-
-  brandingMessage.innerHTML =
-    '<p style="color:green">Industry template applied.</p>'
-}
-
-    function showSettingsTab(tabName) {
-      businessSettingsSection.style.display = 'none'
-      operationsSettingsSection.style.display = 'none'
-      brandingSettingsSection.style.display = 'none'
-
-      businessTabButton.classList.remove('active')
-      operationsTabButton.classList.remove('active')
-      brandingTabButton.classList.remove('active')
-
-      if (tabName === 'business') {
-      businessSettingsSection.style.display = 'block'
-      businessTabButton.classList.add('active')
-      }
-
-      if (tabName === 'operations') {
-        operationsSettingsSection.style.display = 'block'
-        operationsTabButton.classList.add('active')
-      }
-
-      if (tabName === 'branding') {
-        brandingSettingsSection.style.display = 'block'
-        brandingTabButton.classList.add('active')
-      }
-    }
-
-    let editingCustomFieldId = null
-
-    async function loadCustomFieldsList() {
-    const fields = await loadCustomFields()
-
-  if (fields.length === 0) {
-    customFieldsList.innerHTML = '<p>No custom fields yet.</p>'
-    return
-  }
-
-  customFieldsList.innerHTML = fields.map((field) => `
-    <div style="border:1px solid #ccc; padding:12px; margin-bottom:10px; border-radius:8px;">
-      <strong>${field.field_label}</strong><br>
-      Type: ${field.field_type}<br>
-      Required: ${field.is_required ? 'Yes' : 'No'}<br><br>
-
-  <button 
-  class="edit-field-button" 
-  data-id="${field.id}"
-  data-label="${field.field_label}"
-  data-type="${field.field_type}"
-  data-required="${field.is_required}"
-  data-options="${field.field_options || ''}"
->
-  Edit Field
-</button>
-
-<button class="move-field-up-button" data-id="${field.id}">
-  ↑ Up
-</button>
-
-<button class="move-field-down-button" data-id="${field.id}">
-  ↓ Down
-</button>
-
-<button class="delete-field-button" data-id="${field.id}">
-  Delete Field
-</button>
-
-    </div>
-  `).join('')
-}
-    businessProfileForm.addEventListener('submit', async (e) => {
-      e.preventDefault()
-
-    const updatedProfile = {
-      business_name: document.getElementById('businessName').value,
-      reference_prefix: document.getElementById('referencePrefix').value,      
-      business_type: document.getElementById('businessType').value,
-      industry_template: document.getElementById('industryTemplate').value,
-      booking_label: document.getElementById('bookingLabel').value,
-      customer_label: document.getElementById('customerLabel').value,
-      capacity_label: document.getElementById('capacityLabel').value,
-      uses_capacity: document.getElementById('usesCapacity').checked
-  }
-
-  const { error } = await supabase
-    .from('business_profile')
-    .update(updatedProfile)
-    .eq('business_id', currentBusinessId)
-
-  if (error) {
-    console.error(error)
-    brandingMessage.innerHTML = '<p style="color:red">Could not save business profile.</p>'
-    return
-  }
-
-  brandingMessage.innerHTML = '<p style="color:green">Business profile saved. Refresh page to see changes.</p>'
-})
-
-brandingForm.addEventListener('submit', async (e) => {
-  e.preventDefault()
-
-  const updatedBranding = {
-    restaurant_name: document.getElementById('restaurantName').value,
-    primary_color: document.getElementById('primaryColor').value,
-    background_start: document.getElementById('backgroundStart').value,
-    background_end: document.getElementById('backgroundEnd').value
-  }
-
-  const { error } = await supabase
-    .from('restaurant_branding')
-    .update(updatedBranding)
-    .eq('id', branding.id)
-
-  if (error) {
-    console.error(error)
-    brandingMessage.innerHTML = '<p style="color:red">Could not save brand settings.</p>'
-    return
-  }
-
-  brandingMessage.innerHTML = '<p style="color:green">Brand settings saved. Refresh page to see changes.</p>'
-})
-
-operationalSettingsForm.addEventListener('submit', async (e) => {
-  e.preventDefault()
-
-  const updatedSettings = {
-    opening_time: document.getElementById('openingTime').value,
-    closing_time: document.getElementById('closingTime').value,
-    max_guests_per_slot: parseInt(document.getElementById('maxGuestsPerSlot').value),
-    default_duration_minutes: parseInt(document.getElementById('defaultDurationMinutes').value)
-  }
-
-  const { error } = await supabase
-    .from('restaurant_settings')
-    .update(updatedSettings)
-    .eq('business_id', currentBusinessId)
-
-  if (error) {
-    console.error(error)
-    brandingMessage.innerHTML = '<p style="color:red">Could not save operational settings.</p>'
-    return
-  }
-
-  brandingMessage.innerHTML = '<p style="color:green">Operational settings saved.</p>'
-})
-
-  scaleOptionsButton.addEventListener('click', () => {
-  document.getElementById('customFieldOptions').value =
-    `1 - Lowest
-2
-3
-4
-5
-6
-7
-8
-9
-10 - Highest`
-})
-
-customFieldForm.addEventListener('submit', async (e) => {
-  e.preventDefault()
-
-  const field_label = document.getElementById('customFieldLabel').value.trim()
-  const field_type = document.getElementById('customFieldType').value
-  const field_options = document.getElementById('customFieldOptions').value.trim()
-  const is_required = document.getElementById('customFieldRequired').checked
-
-  if (!field_label) {
-    brandingMessage.innerHTML = '<p style="color:red">Please enter a field label.</p>'
-    return
-  }
-
-  if (editingCustomFieldId) {
-  const { error } = await supabase
-    .from('booking_custom_fields')
-    .update({
-      field_label,
-      field_type,
-      field_options,
-      is_required
-    })
-    .eq('id', editingCustomFieldId)
-
-  if (error) {
-    console.error(error)
-    brandingMessage.innerHTML = '<p style="color:red">Could not update custom field.</p>'
-    return
-  }
-
-  brandingMessage.innerHTML = '<p style="color:green">Custom field updated.</p>'
-
-  editingCustomFieldId = null
-  customFieldForm.reset()
-  customFieldForm.querySelector('button[type="submit"]').textContent = 'Add Custom Field'
-  
-  loadCustomFieldsList()
-  return
-}
-
-
-  const { data: existingFields } = await supabase
-    .from('booking_custom_fields')
-    .select('*')
-
-  const display_order = existingFields.length + 1
-
-  const { error } = await supabase
-    .from('booking_custom_fields')
-    .insert([
-      {
-        business_id: currentBusinessId,
-        field_label,
-        field_type,
-        field_options,
-        is_required,
-        display_order,
-        is_active: true
-      }
-    ])
-
-  if (error) {
-    console.error(error)
-    brandingMessage.innerHTML = '<p style="color:red">Could not add custom field.</p>'
-    return
-  }
-
-  brandingMessage.innerHTML = '<p style="color:green">Custom field added.</p>'
-  customFieldForm.reset()
-  loadCustomFieldsList()
-})
-
-async function moveCustomField(fieldId, direction) {
-  const fields = await loadCustomFields()
-
-  const currentIndex = fields.findIndex(
-    field => String(field.id) === String(fieldId)
-  )
-
-  if (currentIndex === -1) {
-    return
-  }
-
-  const swapIndex =
-    direction === 'up'
-      ? currentIndex - 1
-      : currentIndex + 1
-
-  if (swapIndex < 0 || swapIndex >= fields.length) {
-    return
-  }
-
-  const currentField = fields[currentIndex]
-  const swapField = fields[swapIndex]
-
-  await supabase
-    .from('booking_custom_fields')
-    .update({ display_order: swapField.display_order })
-    .eq('id', currentField.id)
-
-  await supabase
-    .from('booking_custom_fields')
-    .update({ display_order: currentField.display_order })
-    .eq('id', swapField.id)
-
-  loadCustomFieldsList()
-}
-
-customFieldsList.addEventListener('click', async (e) => {
-  if (e.target.classList.contains('move-field-up-button')) {
-  const fieldId = e.target.dataset.id
-  await moveCustomField(fieldId, 'up')
-  return
-}
-
-if (e.target.classList.contains('move-field-down-button')) {
-  const fieldId = e.target.dataset.id
-  await moveCustomField(fieldId, 'down')
-  return
-}
-
-  if (e.target.classList.contains('edit-field-button')) {
-  editingCustomFieldId = e.target.dataset.id
-
-  document.getElementById('customFieldLabel').value = e.target.dataset.label
-  document.getElementById('customFieldType').value = e.target.dataset.type
-  document.getElementById('customFieldRequired').checked =
-    e.target.dataset.required === 'true'
-
-  customFieldForm.querySelector('button[type="submit"]').textContent =
-    'Update Custom Field'
-
-  brandingMessage.innerHTML =
-    '<p style="color:green">Editing custom field. Update the form and save.</p>'
-
-  return
-}
-
-  if (e.target.classList.contains('delete-field-button')) {
-    const fieldId = e.target.dataset.id
-
-    const confirmDelete = confirm('Delete this custom field? Existing bookings will keep their saved answers.')
-
-    if (!confirmDelete) {
-      return
-    }
-
-    const { error } = await supabase
-      .from('booking_custom_fields')
-      .delete()
-      .eq('id', fieldId)
-
-    if (error) {
-      console.error(error)
-      brandingMessage.innerHTML = '<p style="color:red">Could not delete custom field.</p>'
-      return
-    }
-
-    brandingMessage.innerHTML = '<p style="color:green">Custom field deleted.</p>'
-    loadCustomFieldsList()
-  }
-})
-
-    logoForm.addEventListener('submit', async (e) => {
-      e.preventDefault()
-
-      const logoUpload = document.getElementById('logoUpload')
-      const file = logoUpload.files[0]
-
-      if (!file) {
-        brandingMessage.innerHTML = '<p style="color:red">Please choose an image first.</p>'
-        return
-      }
-
-      const fileName = `logo-${Date.now()}-${file.name}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('restaurant-logos')
-        .upload(fileName, file)
-
-      if (uploadError) {
-        console.error(uploadError)
-        brandingMessage.innerHTML = '<p style="color:red">Logo upload failed.</p>'
-        return
-      }
-
-      const { data: publicUrlData } = supabase.storage
-        .from('restaurant-logos')
-        .getPublicUrl(fileName)
-
-      const logoUrl = publicUrlData.publicUrl
-
-      const { error: updateError } = await supabase
-        .from('restaurant_branding')
-        .update({ logo_url: logoUrl })
-        .eq('id', branding.id)
-
-      if (updateError) {
-        console.error(updateError)
-        brandingMessage.innerHTML = '<p style="color:red">Logo uploaded but branding update failed.</p>'
-        return
-      }
-
-      brandingMessage.innerHTML = '<p style="color:green">Logo uploaded successfully. Refresh page to see it.</p>'
-    })
-
-      businessTabButton.addEventListener('click', () => {
-        showSettingsTab('business')
-      })
-
-      operationsTabButton.addEventListener('click', () => {
-        showSettingsTab('operations')
-      })
-
-      brandingTabButton.addEventListener('click', () => {
-        showSettingsTab('branding')
-      })
-
-      applyTemplateButton.addEventListener('click', async () => {
-
-  const template =
-    document.getElementById('industryTemplate').value
-
-  const confirmed = confirm(
-    'Replace current custom fields with this template? Existing bookings will keep their saved answers.'
-  )
-
-  if (!confirmed) {
-    return
-  }
-
-  await applyIndustryTemplate(template)
-})
-
-if (businessSwitcher) {
-  businessSwitcher.addEventListener('change', () => {
-    const selectedSlug = businessSwitcher.value
-
-    window.location.href =
-      `/${selectedSlug}/admin/settings`
-  })
-}
-
-  showSettingsTab('business')
-
-  loadCustomFieldsList()
-
-  }
-}
-
-
-
-  if (pageRoute === '/admin/analytics') {
-
-  const branding = await loadBranding()
-  const businesses = await loadBusinesses()
-  const profile = await loadBusinessProfile()
-
-  if (!(await requireAdminAccess(profile.business_name))) {
-    // The sign-in or access message is rendered by requireAdminAccess.
-  } else {
-
-    document.querySelector('#app').innerHTML = `
-      ${branding.logo_url ? `<img src="${branding.logo_url}" class="brand-logo" />` : ''}
-
-      <h1>${profile.business_name} Analytics</h1>
-
-    <select id="businessSwitcher">
-      ${businesses.map(business => `
-    <option
-      value="${business.business_slug}"
-      ${business.business_slug === currentBusinessSlug
-        ? 'selected'
-        : ''}
-    >
-      ${business.business_name}
-    </option>
-  `).join('')}
-    </select>
-
-      <br /><br />
-
-      <div class="admin-nav">
-        <a href="/${currentBusinessSlug}/admin">Dashboard</a>
-        <a href="/${currentBusinessSlug}/admin/analytics">Analytics</a>
-        <a href="/${currentBusinessSlug}/admin/settings">Settings</a>
-      </div>
-
-      <label>Start Date</label>
-      <input type="date" id="analyticsStartDate" />
-
-      <br /><br />
-
-      <label>End Date</label>
-      <input type="date" id="analyticsEndDate" />
-
-      <br /><br />
-
-      <button id="loadAnalyticsButton">
-        Load Analytics
-      </button>
-
-      <hr>
-
-      <div id="analyticsResults">
-        Select a date range and click Load Analytics.
-      </div>
-    `
-
-    const analyticsStartDate = document.getElementById('analyticsStartDate')
-    const analyticsEndDate = document.getElementById('analyticsEndDate')
-    const loadAnalyticsButton = document.getElementById('loadAnalyticsButton')
-    const analyticsResults = document.getElementById('analyticsResults')
-    const businessSwitcher = document.getElementById('businessSwitcher')
-
-    const today = new Date().toISOString().split('T')[0]
-
-analyticsStartDate.value = today
-analyticsEndDate.value = today
-
-async function loadAnalytics() {
-  const startDate = analyticsStartDate.value
-  const endDate = analyticsEndDate.value
-
-  const { data, error } = await supabase
-  .from('reservations')
-  .select('*')
-  .eq('business_id', currentBusinessId)
-  .gte('reservation_date', startDate)
-  .lte('reservation_date', endDate)
-
-  if (error) {
-    console.error(error)
-    analyticsResults.innerHTML = `
-      <p style="color:red">Could not load analytics.</p>
-    `
-    return
-  }
-
-  const totalReservations = data.length
-
-  const confirmed = data.filter(
-    reservation => reservation.status === 'confirmed'
-  )
-
-  const completed = data.filter(
-    reservation => reservation.status === 'completed'
-  )
-
-  const cancelled = data.filter(
-    reservation => reservation.status === 'cancelled'
-  )
-
-  const noShows = data.filter(
-    reservation => reservation.status === 'no_show'
-  )
-
-  const archived = data.filter(
-    reservation => reservation.is_archived
-  )
-
-  const totalCapacityUnits = data.reduce(
-  (total, reservation) => total + reservation.party_size,
-  0
-)
-
-  const completionRate =
-    totalReservations > 0
-      ? Math.round((completed.length / totalReservations) * 100)
-      : 0
-
-  const cancellationRate =
-    totalReservations > 0
-      ? Math.round((cancelled.length / totalReservations) * 100)
-      : 0
-
-  const noShowRate =
-    totalReservations > 0
-      ? Math.round((noShows.length / totalReservations) * 100)
-      : 0
-
-  const averageCapacityUnits =
-  totalReservations > 0
-    ? (totalCapacityUnits / totalReservations).toFixed(1)
-    : 0
-
-  const timeCounts = {}
-
-  data.forEach((reservation) => {
-    const time = reservation.reservation_time
-
-    if (!timeCounts[time]) {
-      timeCounts[time] = 0
-    }
-
-    timeCounts[time] += 1
-  })
-
-  let busiestTime = 'N/A'
-  let busiestTimeCount = 0
-
-  Object.entries(timeCounts).forEach(([time, count]) => {
-    if (count > busiestTimeCount) {
-      busiestTime = time
-      busiestTimeCount = count
-    }
-  })
-
-  analyticsResults.innerHTML = `
-    <div class="summary-grid">
-      <div class="summary-card">
-        <h3>Total ${profile.booking_label}s</h3>
-        <p>${totalReservations}</p>
-      </div>
-
-      ${
-  profile.uses_capacity
-    ? `
-      <div class="summary-card">
-        <h3>Total ${profile.capacity_label}</h3>
-        <p>${totalCapacityUnits}</p>
-      </div>
-    `
-    : ''
-}
-
-      <div class="summary-card">
-        <h3>Confirmed</h3>
-        <p>${confirmed.length}</p>
-      </div>
-
-      <div class="summary-card">
-        <h3>Completed</h3>
-        <p>${completed.length}</p>
-      </div>
-
-      <div class="summary-card">
-        <h3>Cancelled</h3>
-        <p>${cancelled.length}</p>
-      </div>
-
-      <div class="summary-card">
-        <h3>No Shows</h3>
-        <p>${noShows.length}</p>
-      </div>
-
-      <div class="summary-card">
-        <h3>Archived</h3>
-        <p>${archived.length}</p>
-      </div>
-
-      <div class="summary-card">
-        <h3>Completion Rate</h3>
-        <p>${completionRate}%</p>
-      </div>
-
-      <div class="summary-card">
-        <h3>Cancellation Rate</h3>
-        <p>${cancellationRate}%</p>
-      </div>
-
-      <div class="summary-card">
-        <h3>No Show Rate</h3>
-        <p>${noShowRate}%</p>
-      </div>
-
-    </div>
+    </main>
   `
-}
 
-  if (businessSwitcher) {
-    businessSwitcher.addEventListener('change', () => {
-    const selectedSlug = businessSwitcher.value
+  if (!canManage) return
+  const message = document.getElementById('brandingMessage')
 
-    window.location.href =
-      `/${selectedSlug}/admin/analytics`
+  document.getElementById('businessProfileForm').addEventListener('submit', async event => {
+    event.preventDefault()
+    const payload = {
+      business_name: document.getElementById('businessName').value.trim(),
+      booking_label: document.getElementById('bookingLabel').value.trim(),
+      customer_label: document.getElementById('customerLabel').value.trim(),
+      capacity_label: document.getElementById('capacityLabel').value.trim(),
+      uses_capacity: document.getElementById('usesCapacity').checked
+    }
+    const { error } = await supabase.from('business_profile').update(payload).eq('business_id', businessId)
+    message.textContent = error ? error.message : 'Business profile saved.'
+  })
+
+  document.getElementById('operationalSettingsForm').addEventListener('submit', async event => {
+    event.preventDefault()
+    const payload = {
+      opening_time: document.getElementById('openingTime').value,
+      closing_time: document.getElementById('closingTime').value,
+      max_guests_per_slot: Number(document.getElementById('maxGuestsPerSlot').value),
+      default_duration_minutes: Number(document.getElementById('defaultDurationMinutes').value)
+    }
+    const { error } = await supabase.from('restaurant_settings').update(payload).eq('business_id', businessId)
+    message.textContent = error ? error.message : 'Operational settings saved.'
+  })
+
+  document.getElementById('brandingForm').addEventListener('submit', async event => {
+    event.preventDefault()
+    const payload = {
+      restaurant_name: document.getElementById('restaurantName').value.trim(),
+      primary_color: document.getElementById('primaryColor').value
+    }
+    const { error } = await supabase.from('restaurant_branding').update(payload).eq('business_id', businessId)
+    message.textContent = error ? error.message : 'Brand settings saved.'
   })
 }
 
-loadAnalyticsButton.addEventListener('click', loadAnalytics)
+const context = await loadBusinessContext()
 
-loadAnalytics()
-      }
-}
+if (route === 'admin') await renderBookings(context)
+if (route === 'admin/analytics') await renderAnalytics(context)
+if (route === 'admin/settings') await renderSettings(context)
