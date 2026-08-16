@@ -114,8 +114,20 @@ function startCustomerDashboardView() {
   return new Promise((resolve) => {
     let completed = false
     let sessionExchangeInFlight = false
+    let readyHeartbeat = null
+    let timeoutId = null
+
+    const postReady = () => {
+      if (completed || sessionExchangeInFlight) return
+      window.parent.postMessage(
+        { type: 'terrapeak:reservations-ready', businessSlug },
+        parentOrigin
+      )
+    }
 
     const finish = (result) => {
+      if (readyHeartbeat) window.clearInterval(readyHeartbeat)
+      if (timeoutId) window.clearTimeout(timeoutId)
       window.removeEventListener('message', receiveSession)
       resolve(result)
     }
@@ -140,6 +152,8 @@ function startCustomerDashboardView() {
       }
 
       sessionExchangeInFlight = true
+      if (readyHeartbeat) window.clearInterval(readyHeartbeat)
+
       const { error } = await establishSupabaseSession(bootstrap)
 
       if (error) {
@@ -156,17 +170,19 @@ function startCustomerDashboardView() {
     }
 
     window.addEventListener('message', receiveSession)
-    window.parent.postMessage(
-      { type: 'terrapeak:reservations-ready', businessSlug },
-      parentOrigin
-    )
 
-    window.setTimeout(() => {
+    // The parent and iframe load independently. Repeat the readiness signal until
+    // the trusted bootstrap arrives so a fast iframe cannot race React's message
+    // listener and remain stuck on the connecting screen.
+    postReady()
+    readyHeartbeat = window.setInterval(postReady, 500)
+
+    timeoutId = window.setTimeout(() => {
       if (completed) return
       completed = true
       renderUnavailable('The TerraPeak Reservations connection timed out. Return to the dashboard and try again.')
       finish(false)
-    }, 12000)
+    }, 20000)
   })
 }
 
@@ -174,10 +190,11 @@ if (isManagementRoute) {
   if (!isCustomerDashboardView) {
     renderUnavailable('Reservations management is controlled by TerraPeak. Open this company from the TerraPeak Dashboard instead of signing in separately.')
   } else {
-    const connected = await startCustomerDashboardView()
-    if (connected) {
-      await import('./main.js')
-    }
+    // Management module loading is deliberately owned by index.html. This
+    // bootstrap only establishes the trusted TerraPeak session/context; loading
+    // main.js here would bypass trusted-management-runtime and reintroduce the
+    // old management generation before authority is installed.
+    await startCustomerDashboardView()
   }
 } else {
   const validBusiness = await validatePublicBusinessRoute()
