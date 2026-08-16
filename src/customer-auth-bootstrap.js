@@ -47,7 +47,7 @@ function renderUnavailable(message = 'This Reservations workspace is not configu
     <main class="auth-card">
       <h1>Reservations workspace not available</h1>
       <p>${message}</p>
-      <a href="https://dashboard.terrapeakgroup.com/dashboard/reservations">Return to TerraPeak Reservations</a>
+      <a href="https://dashboard.terrapeakgroup.com/dashboard/reservations" target="_top">Return to TerraPeak Reservations</a>
     </main>
   `
 }
@@ -78,9 +78,10 @@ async function startCustomerDashboardView(validBusiness) {
   `
 
   let completed = false
+  let sessionExchangeInFlight = false
 
   const receiveSession = async (event) => {
-    if (completed || event.source !== window.parent) return
+    if (completed || sessionExchangeInFlight || event.source !== window.parent) return
     if (event.origin !== parentOrigin) return
     if (event.data?.type !== 'terrapeak:reservations-session') return
 
@@ -94,16 +95,24 @@ async function startCustomerDashboardView(validBusiness) {
       return
     }
 
+    // The OTP token is single-use. Lock the exchange before awaiting Supabase so
+    // duplicate parent messages cannot consume the same token concurrently.
+    sessionExchangeInFlight = true
+
     const { error } = await supabase.auth.verifyOtp({
       token_hash: bootstrap.tokenHash,
       type: bootstrap.type || 'email'
     })
 
     if (error) {
+      sessionExchangeInFlight = false
       console.error('Could not establish Reservations session:', error)
       renderUnavailable('Your TerraPeak Reservations session could not be established. Return to the dashboard and try again.')
       return
     }
+
+    completed = true
+    window.removeEventListener('message', receiveSession)
 
     window.__TERRAPEAK_RESERVATIONS_CONTEXT__ = Object.freeze({
       companyId: String(bootstrap.companyId || ''),
@@ -115,8 +124,6 @@ async function startCustomerDashboardView(validBusiness) {
       source: 'terrapeak-dashboard'
     })
 
-    completed = true
-    window.removeEventListener('message', receiveSession)
     await import('./main.js')
   }
 
