@@ -25,7 +25,7 @@ const managementSegments = new Set([
 const reservedSegments = new Set([...managementSegments, 'book', 'onboarding'])
 const isManagementRoute = pathParts.length > 1 && managementSegments.has(String(pathParts[1] || '').toLowerCase())
 
-async function validateBusinessRoute() {
+async function validatePublicBusinessRoute() {
   if (!businessSlug || reservedSegments.has(businessSlug.toLowerCase())) {
     return null
   }
@@ -97,7 +97,7 @@ function storeTrustedContext(bootstrap) {
   window.__TERRAPEAK_RESERVATIONS_READY__ = true
 }
 
-function startCustomerDashboardView(validBusiness) {
+function startCustomerDashboardView() {
   const parentOrigin = getTrustedParentOrigin()
   if (!parentOrigin || window.parent === window) {
     renderUnavailable('Reservations management must be opened from the TerraPeak Dashboard.')
@@ -126,10 +126,12 @@ function startCustomerDashboardView(validBusiness) {
       if (event.data?.type !== 'terrapeak:reservations-session') return
 
       const bootstrap = event.data.bootstrap
+      const trustedBusinessId = Number(bootstrap?.businessId)
       if (
         !bootstrap?.tokenHash ||
         bootstrap.businessSlug !== businessSlug ||
-        Number(bootstrap.businessId) !== Number(validBusiness.id)
+        !Number.isFinite(trustedBusinessId) ||
+        trustedBusinessId <= 0
       ) {
         completed = true
         renderUnavailable('The TerraPeak company does not match this Reservations workspace.')
@@ -168,17 +170,20 @@ function startCustomerDashboardView(validBusiness) {
   })
 }
 
-const validBusiness = await validateBusinessRoute()
-
-if (!validBusiness) {
-  renderUnavailable()
-} else if (isManagementRoute && !isCustomerDashboardView) {
-  renderUnavailable('Reservations management is controlled by TerraPeak. Open this company from the TerraPeak Dashboard instead of signing in separately.')
-} else if (isCustomerDashboardView) {
-  const connected = await startCustomerDashboardView(validBusiness)
-  if (connected) {
-    await import('./main.js')
+if (isManagementRoute) {
+  if (!isCustomerDashboardView) {
+    renderUnavailable('Reservations management is controlled by TerraPeak. Open this company from the TerraPeak Dashboard instead of signing in separately.')
+  } else {
+    const connected = await startCustomerDashboardView()
+    if (connected) {
+      await import('./main.js')
+    }
   }
 } else {
-  await import('./main.js')
+  const validBusiness = await validatePublicBusinessRoute()
+  if (!validBusiness) {
+    renderUnavailable()
+  } else {
+    await import('./main.js')
+  }
 }
