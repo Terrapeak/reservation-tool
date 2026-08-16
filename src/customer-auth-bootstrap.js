@@ -63,11 +63,45 @@ function getTrustedParentOrigin() {
   }
 }
 
-async function startCustomerDashboardView(validBusiness) {
+async function establishSupabaseSession(bootstrap) {
+  const { data: sessionData } = await supabase.auth.getSession()
+  const currentSession = sessionData?.session || null
+
+  if (
+    currentSession?.user?.id &&
+    bootstrap?.supabaseUserId &&
+    currentSession.user.id === bootstrap.supabaseUserId
+  ) {
+    return { error: null, reused: true }
+  }
+
+  const { error } = await supabase.auth.verifyOtp({
+    token_hash: bootstrap.tokenHash,
+    type: bootstrap.type || 'email'
+  })
+
+  return { error, reused: false }
+}
+
+function storeTrustedContext(bootstrap) {
+  window.__TERRAPEAK_RESERVATIONS_CONTEXT__ = Object.freeze({
+    companyId: String(bootstrap.companyId || ''),
+    companyRole: String(bootstrap.companyRole || 'viewer').toLowerCase(),
+    capabilities: Object.freeze({ ...(bootstrap.capabilities || {}) }),
+    reservationsCompatibilityRole: String(bootstrap.reservationsCompatibilityRole || ''),
+    businessId: Number(bootstrap.businessId),
+    businessSlug: bootstrap.businessSlug,
+    supabaseUserId: String(bootstrap.supabaseUserId || ''),
+    source: 'terrapeak-dashboard'
+  })
+  window.__TERRAPEAK_RESERVATIONS_READY__ = true
+}
+
+function startCustomerDashboardView(validBusiness) {
   const parentOrigin = getTrustedParentOrigin()
   if (!parentOrigin || window.parent === window) {
     renderUnavailable('Reservations management must be opened from the TerraPeak Dashboard.')
-    return
+    return Promise.resolve(false)
   }
 
   document.querySelector('#app').innerHTML = `
@@ -77,61 +111,61 @@ async function startCustomerDashboardView(validBusiness) {
     </main>
   `
 
-  let completed = false
-  let sessionExchangeInFlight = false
+  return new Promise((resolve) => {
+    let completed = false
+    let sessionExchangeInFlight = false
 
-  const receiveSession = async (event) => {
-    if (completed || sessionExchangeInFlight || event.source !== window.parent) return
-    if (event.origin !== parentOrigin) return
-    if (event.data?.type !== 'terrapeak:reservations-session') return
-
-    const bootstrap = event.data.bootstrap
-    if (
-      !bootstrap?.tokenHash ||
-      bootstrap.businessSlug !== businessSlug ||
-      Number(bootstrap.businessId) !== Number(validBusiness.id)
-    ) {
-      renderUnavailable('The TerraPeak company does not match this Reservations workspace.')
-      return
+    const finish = (result) => {
+      window.removeEventListener('message', receiveSession)
+      resolve(result)
     }
 
-    // The OTP token is single-use. Lock the exchange before awaiting Supabase so
-    // duplicate parent messages cannot consume the same token concurrently.
-    sessionExchangeInFlight = true
+    const receiveSession = async (event) => {
+      if (completed || sessionExchangeInFlight || event.source !== window.parent) return
+      if (event.origin !== parentOrigin) return
+      if (event.data?.type !== 'terrapeak:reservations-session') return
 
-    const { error } = await supabase.auth.verifyOtp({
-      token_hash: bootstrap.tokenHash,
-      type: bootstrap.type || 'email'
-    })
+      const bootstrap = event.data.bootstrap
+      if (
+        !bootstrap?.tokenHash ||
+        bootstrap.businessSlug !== businessSlug ||
+        Number(bootstrap.businessId) !== Number(validBusiness.id)
+      ) {
+        completed = true
+        renderUnavailable('The TerraPeak company does not match this Reservations workspace.')
+        finish(false)
+        return
+      }
 
-    if (error) {
-      sessionExchangeInFlight = false
-      console.error('Could not establish Reservations session:', error)
-      renderUnavailable('Your TerraPeak Reservations session could not be established. Return to the dashboard and try again.')
-      return
+      sessionExchangeInFlight = true
+      const { error } = await establishSupabaseSession(bootstrap)
+
+      if (error) {
+        completed = true
+        console.error('Could not establish Reservations session:', error)
+        renderUnavailable('Your TerraPeak Reservations session could not be established. Return to the dashboard and try again.')
+        finish(false)
+        return
+      }
+
+      completed = true
+      storeTrustedContext(bootstrap)
+      finish(true)
     }
 
-    completed = true
-    window.removeEventListener('message', receiveSession)
+    window.addEventListener('message', receiveSession)
+    window.parent.postMessage(
+      { type: 'terrapeak:reservations-ready', businessSlug },
+      parentOrigin
+    )
 
-    window.__TERRAPEAK_RESERVATIONS_CONTEXT__ = Object.freeze({
-      companyId: String(bootstrap.companyId || ''),
-      companyRole: String(bootstrap.companyRole || 'viewer').toLowerCase(),
-      capabilities: Object.freeze({ ...(bootstrap.capabilities || {}) }),
-      reservationsCompatibilityRole: String(bootstrap.reservationsCompatibilityRole || ''),
-      businessId: Number(bootstrap.businessId),
-      businessSlug: bootstrap.businessSlug,
-      source: 'terrapeak-dashboard'
-    })
-
-    await import('./main.js')
-  }
-
-  window.addEventListener('message', receiveSession)
-  window.parent.postMessage(
-    { type: 'terrapeak:reservations-ready', businessSlug },
-    parentOrigin
-  )
+    window.setTimeout(() => {
+      if (completed) return
+      completed = true
+      renderUnavailable('The TerraPeak Reservations connection timed out. Return to the dashboard and try again.')
+      finish(false)
+    }, 12000)
+  })
 }
 
 const validBusiness = await validateBusinessRoute()
