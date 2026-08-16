@@ -21,7 +21,6 @@ if (isCustomerManagement) {
 
   const originalFrom = supabase.from.bind(supabase)
   const businessScopedTables = new Set([
-    'businesses',
     'business_memberships',
     'restaurant_branding',
     'restaurant_settings',
@@ -40,6 +39,19 @@ if (isCustomerManagement) {
   supabase.from = (table) => {
     const builder = originalFrom(table)
 
+    if (table === 'businesses') {
+      return new Proxy(builder, {
+        get(target, property, receiver) {
+          if (property !== 'select') {
+            const value = Reflect.get(target, property, receiver)
+            return typeof value === 'function' ? value.bind(target) : value
+          }
+
+          return (...args) => target.select(...args).eq('id', trustedBusinessId)
+        }
+      })
+    }
+
     if (!businessScopedTables.has(table)) {
       return builder
     }
@@ -51,15 +63,11 @@ if (isCustomerManagement) {
           return typeof value === 'function' ? value.bind(target) : value
         }
 
-        return (...args) => {
-          const query = target.select(...args)
-          return query.eq('business_id', trustedBusinessId)
-        }
+        return (...args) => target.select(...args).eq('business_id', trustedBusinessId)
       }
     })
   }
 
-  const originalSignInWithPassword = supabase.auth.signInWithPassword.bind(supabase.auth)
   supabase.auth.signInWithPassword = async () => ({
     data: { user: null, session: null },
     error: new Error('Reservations management authentication is controlled by TerraPeak.')
@@ -72,7 +80,4 @@ if (isCustomerManagement) {
     capabilities: Object.freeze({ ...(context?.capabilities || {}) }),
     source: 'terrapeak-dashboard'
   })
-
-  // Keep a reference only for diagnostics. Customer management code must not use it.
-  void originalSignInWithPassword
 }
