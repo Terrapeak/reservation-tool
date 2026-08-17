@@ -171,9 +171,6 @@ function startCustomerDashboardView() {
 
     window.addEventListener('message', receiveSession)
 
-    // The parent and iframe load independently. Repeat the readiness signal until
-    // the trusted bootstrap arrives so a fast iframe cannot race React's message
-    // listener and remain stuck on the connecting screen.
     postReady()
     readyHeartbeat = window.setInterval(postReady, 500)
 
@@ -190,10 +187,6 @@ if (isManagementRoute) {
   if (!isCustomerDashboardView) {
     renderUnavailable('Reservations management is controlled by TerraPeak. Open this company from the TerraPeak Dashboard instead of signing in separately.')
   } else {
-    // Management module loading is deliberately owned by index.html. This
-    // bootstrap only establishes the trusted TerraPeak session/context; loading
-    // main.js here would bypass trusted-management-runtime and reintroduce the
-    // old management generation before authority is installed.
     await startCustomerDashboardView()
   }
 } else {
@@ -201,6 +194,10 @@ if (isManagementRoute) {
   if (!validBusiness) {
     renderUnavailable()
   } else {
-    await import('./main.js')
+    const canonicalPublicPath = `/book/${encodeURIComponent(validBusiness.business_slug || businessSlug)}`
+    if (window.location.pathname !== canonicalPublicPath) {
+      window.history.replaceState({}, '', `${canonicalPublicPath}${window.location.search}${window.location.hash}`)
+    }
+    await import('./public-booking.js')
   }
 }
