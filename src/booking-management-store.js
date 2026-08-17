@@ -93,10 +93,18 @@ export async function listManagedBookings({ businessId, startDate, endDate, refe
   if (canonicalResult.error) throw canonicalResult.error
   if (legacyResult.error) throw legacyResult.error
 
-  let rows = [
-    ...(canonicalResult.data || []).map(normalizeCanonicalBooking),
-    ...(legacyResult.data || []).map(normalizeLegacyReservation)
-  ]
+  const canonicalRows = (canonicalResult.data || []).map(normalizeCanonicalBooking)
+  const canonicalIds = new Set(canonicalRows.map(row => String(row.id)))
+  const canonicalReferences = new Set(canonicalRows.map(row => row.reference).filter(Boolean))
+
+  // During migration, keep legacy rows visible only when they have not yet been
+  // represented in the canonical bookings table. This makes the read path safe
+  // across partially migrated businesses without double-counting migrated data.
+  const legacyRows = (legacyResult.data || [])
+    .map(normalizeLegacyReservation)
+    .filter(row => !canonicalIds.has(String(row.id)) && (!row.reference || !canonicalReferences.has(row.reference)))
+
+  let rows = [...canonicalRows, ...legacyRows]
 
   if (!reference && viewMode === 'active') rows = rows.filter(row => !row.archived)
   if (!reference && viewMode === 'archived') rows = rows.filter(row => row.archived)
