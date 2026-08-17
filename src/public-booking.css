@@ -15,6 +15,7 @@
 .manager-current{border-top:1px solid #dce7df;padding-top:22px}.manager-current h3{font-size:1.4rem;margin:.3rem 0}.manager-actions{display:flex;gap:10px;flex-wrap:wrap}.manager-actions .danger{background:#9d3028}
 #managerOptions{margin-top:20px}#managerOptions>label{display:grid;gap:7px;max-width:260px;font-weight:700}#managerOptions input{font:inherit;border:1px solid #bdcec2;border-radius:10px;padding:12px;margin-bottom:14px}
 .manager-slot{display:grid;gap:3px}.manager-slot small{font-weight:500}.manager-message{min-height:1.2em}
+.restaurant-calendar .slot,.calendar-panel .slot{display:grid;gap:3px}.calendar-panel .slot small{font-size:.72rem;font-weight:500}
 
 .booking-form .booking-confirm{display:block!important;visibility:visible!important;opacity:1!important;width:100%;margin-top:18px;border:0;border-radius:10px;background:#285b3b;color:#fff;padding:14px 20px;font:inherit;font-weight:800;cursor:pointer}
 .booking-form .booking-confirm:disabled{opacity:.65!important;cursor:wait}
