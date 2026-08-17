@@ -1,10 +1,14 @@
 import { supabase } from './supabaseclient.js'
+import { bookingDateTimeParts } from './booking-timezone.js'
 
 const FINAL_STATUSES = new Set(['completed', 'cancelled', 'no_show'])
 const CANONICAL_ONLY_VERSION = 2
 
-function normalizeCanonicalBooking(row) {
-  const startsAt = row.starts_at ? new Date(row.starts_at) : null
+function normalizeCanonicalBooking(row, restaurantServiceIds, restaurantTimezone) {
+  const displayZone = restaurantServiceIds.has(Number(row.service_id))
+    ? restaurantTimezone
+    : 'UTC'
+  const display = bookingDateTimeParts(row.starts_at, displayZone)
   return {
     source: 'bookings',
     id: row.id,
@@ -13,12 +17,8 @@ function normalizeCanonicalBooking(row) {
     customerName: row.customer_name || '',
     customerPhone: row.customer_phone || '',
     customerEmail: row.customer_email || '',
-    bookingDate: startsAt && !Number.isNaN(startsAt.valueOf())
-      ? startsAt.toISOString().slice(0, 10)
-      : '',
-    bookingTime: startsAt && !Number.isNaN(startsAt.valueOf())
-      ? startsAt.toISOString().slice(11, 16)
-      : '',
+    bookingDate: display.bookingDate,
+    bookingTime: display.bookingTime,
     startsAt: row.starts_at || null,
     endsAt: row.ends_at || null,
     quantity: Number(row.quantity || 1),
@@ -75,6 +75,29 @@ async function getBookingModelVersion(businessId) {
   return Number(data?.booking_model_version || 1)
 }
 
+async function getCanonicalDisplayContext(businessId) {
+  const [servicesResult, settingsResult] = await Promise.all([
+    supabase
+      .from('services')
+      .select('id')
+      .eq('business_id', businessId)
+      .eq('booking_type', 'restaurant'),
+    supabase
+      .from('restaurant_settings')
+      .select('timezone')
+      .eq('business_id', businessId)
+      .maybeSingle()
+  ])
+
+  if (servicesResult.error) throw servicesResult.error
+  if (settingsResult.error) throw settingsResult.error
+
+  return {
+    restaurantServiceIds: new Set((servicesResult.data || []).map(service => Number(service.id))),
+    restaurantTimezone: settingsResult.data?.timezone || 'UTC'
+  }
+}
+
 function buildCanonicalQuery({ businessId, startDate, endDate, reference }) {
   let query = supabase
     .from('bookings')
@@ -105,11 +128,18 @@ function buildLegacyQuery({ businessId, startDate, endDate, reference }) {
 }
 
 export async function listManagedBookings({ businessId, startDate, endDate, reference = '', viewMode = 'active' }) {
-  const bookingModelVersion = await getBookingModelVersion(businessId)
-  const canonicalResult = await buildCanonicalQuery({ businessId, startDate, endDate, reference })
+  const [bookingModelVersion, canonicalResult, displayContext] = await Promise.all([
+    getBookingModelVersion(businessId),
+    buildCanonicalQuery({ businessId, startDate, endDate, reference }),
+    getCanonicalDisplayContext(businessId)
+  ])
   if (canonicalResult.error) throw canonicalResult.error
 
-  const canonicalRows = (canonicalResult.data || []).map(normalizeCanonicalBooking)
+  const canonicalRows = (canonicalResult.data || []).map(row => normalizeCanonicalBooking(
+    row,
+    displayContext.restaurantServiceIds,
+    displayContext.restaurantTimezone
+  ))
   let rows = canonicalRows
 
   if (bookingModelVersion < CANONICAL_ONLY_VERSION) {
