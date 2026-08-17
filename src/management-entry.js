@@ -5,7 +5,8 @@ if (!runtime || runtime.source !== 'terrapeak-dashboard') {
 }
 
 const route = window.location.pathname.split('/').filter(Boolean).slice(1).join('/')
-const legacyRoutes = new Set(['admin', 'admin/analytics', 'admin/settings'])
+const unifiedBookingRoutes = new Set(['admin', 'admin/analytics'])
+const legacySettingsRoutes = new Set(['admin/settings'])
 const universalRoutes = new Set([
   'admin/services',
   'admin/staff',
@@ -13,20 +14,25 @@ const universalRoutes = new Set([
   'admin/availability'
 ])
 
-if (!legacyRoutes.has(route) && !universalRoutes.has(route)) {
+if (
+  !unifiedBookingRoutes.has(route) &&
+  !legacySettingsRoutes.has(route) &&
+  !universalRoutes.has(route)
+) {
   throw new Error(`Unsupported Reservations management route: ${route}`)
 }
 
 await import('./customer-tenant-lock.js')
 await import('./business-name-unification.js')
 
-if (legacyRoutes.has(route)) {
+if (unifiedBookingRoutes.has(route)) {
+  await import('./unified-bookings-admin.js')
+}
+
+if (legacySettingsRoutes.has(route)) {
   await import('./main.js')
   await import('./admin-enhancements.js')
-
-  if (route === 'admin/settings') {
-    await import('./custom-field-option-repair.js')
-  }
+  await import('./custom-field-option-repair.js')
 }
 
 if (universalRoutes.has(route)) {
