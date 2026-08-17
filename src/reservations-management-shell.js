@@ -42,6 +42,12 @@ function routeLabel(route) {
   return 'Bookings'
 }
 
+function customerManagementHref(path) {
+  const url = new URL(path, window.location.origin)
+  url.searchParams.set('customerView', '1')
+  return `${url.pathname}${url.search}`
+}
+
 function buildNavigation(activeRoute) {
   const base = `/${businessSlug}/dashboard`
   const links = [
@@ -53,9 +59,10 @@ function buildNavigation(activeRoute) {
     ['Settings', `${base}/settings`]
   ]
 
-  return links.map(([label, href]) => {
-    const hrefRoute = href.split('/').slice(2).join('/') || 'dashboard'
+  return links.map(([label, path]) => {
+    const hrefRoute = path.split('/').slice(2).join('/') || 'dashboard'
     const active = canonicalRoute(activeRoute) === hrefRoute
+    const href = customerManagementHref(path)
     return `<a href="${href}" ${active ? 'class="active" aria-current="page"' : ''}>${label}</a>`
   }).join('')
 }
