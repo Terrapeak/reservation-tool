@@ -9,6 +9,7 @@ const TERRAPEAK_DASHBOARD_ORIGINS = new Set([
   'http://localhost:5174',
   'http://localhost:5175'
 ])
+const PARENT_ORIGIN_STORAGE_KEY = 'terrapeak:reservations-parent-origin'
 
 const pathParts = window.location.pathname.split('/').filter(Boolean)
 const businessSlug = pathParts[0] || ''
@@ -52,12 +53,39 @@ function renderUnavailable(message = 'This Reservations workspace is not configu
   `
 }
 
+function allowedDashboardOrigin(value) {
+  return TERRAPEAK_DASHBOARD_ORIGINS.has(String(value || '')) ? String(value) : ''
+}
+
+function rememberParentOrigin(origin) {
+  const trusted = allowedDashboardOrigin(origin)
+  if (!trusted) return ''
+  try {
+    window.sessionStorage.setItem(PARENT_ORIGIN_STORAGE_KEY, trusted)
+  } catch {
+    // Storage can be unavailable in privacy-restricted iframe contexts.
+  }
+  return trusted
+}
+
 function getTrustedParentOrigin() {
-  if (!document.referrer) return ''
+  // document.referrer changes to the previous Reservations URL after an
+  // in-iframe navigation. ancestorOrigins keeps pointing at the real embedding
+  // Dashboard, so prefer it when available and persist the accepted value.
+  const ancestorOrigin = allowedDashboardOrigin(window.location.ancestorOrigins?.[0])
+  if (ancestorOrigin) return rememberParentOrigin(ancestorOrigin)
+
+  if (document.referrer) {
+    try {
+      const referrerOrigin = allowedDashboardOrigin(new URL(document.referrer).origin)
+      if (referrerOrigin) return rememberParentOrigin(referrerOrigin)
+    } catch {
+      // Ignore malformed referrer values and continue with stored context.
+    }
+  }
 
   try {
-    const origin = new URL(document.referrer).origin
-    return TERRAPEAK_DASHBOARD_ORIGINS.has(origin) ? origin : ''
+    return allowedDashboardOrigin(window.sessionStorage.getItem(PARENT_ORIGIN_STORAGE_KEY))
   } catch {
     return ''
   }
