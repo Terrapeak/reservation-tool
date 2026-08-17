@@ -30,7 +30,7 @@ if (unifiedBookingRoutes.has(route)) {
 }
 
 if (legacySettingsRoutes.has(route)) {
-  await import('./main.js')
+  await import('./restaurant-settings.js')
   await import('./admin-enhancements.js')
   await import('./custom-field-option-repair.js')
 }

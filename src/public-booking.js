@@ -18,6 +18,7 @@ async function start() {
   if(!serviceSlug) return businessPage(business)
   const {data:service}=await supabase.from('services').select('*').eq('business_id',business.id).ilike('slug',serviceSlug).eq('is_active',true).eq('is_published',true).maybeSingle()
   if(!service) return fail('This service is not available.')
+  if(service.booking_type==='restaurant') return restaurantServicePage(business,service)
   if(service.scheduling_mode==='scheduled') return scheduledServicePage(business,service)
   if(!staffSlug) return servicePage(business,service)
   const {data:staff}=await supabase.from('staff_members').select('*').eq('business_id',business.id).ilike('slug',staffSlug).eq('is_active',true).eq('is_published',true).maybeSingle()
@@ -39,6 +40,34 @@ async function servicePage(business,service){
   const {data:items=[]}=await supabase.from('staff_services').select('custom_duration_minutes,custom_price,staff_members!inner(*)').eq('service_id',service.id).eq('is_active',true)
   const cards=items.map(item=>{const s=item.staff_members;return '<a class="booking-card staff-card" href="/book/'+esc(business.business_slug)+'/services/'+esc(service.slug)+'/team/'+esc(s.slug)+'"><div class="staff-avatar">'+(s.photo_url?'<img src="'+esc(s.photo_url)+'" alt="">':esc(s.display_name[0]))+'</div><div><h2>'+esc(s.display_name)+'</h2><p>'+esc(s.bio||'')+'</p><span>'+(item.custom_duration_minutes||service.duration_minutes)+' min · '+cash(item.custom_price??service.price,service.currency)+'</span></div></a>'}).join('')
   shell(business,'<section class="booking-hero compact"><p class="booking-kicker">'+esc(service.booking_type)+'</p><h1>'+esc(service.name)+'</h1><p>'+esc(service.description||'Choose a team member.')+'</p></section><h2>Choose your team member</h2><section class="booking-grid">'+(cards||'<p>No team members are available.</p>')+'</section>','<a href="/book/'+esc(business.business_slug)+'">Services</a><span>/</span><span>'+esc(service.name)+'</span>')
+}
+async function restaurantServicePage(business,service){
+  const today=new Date(), max=new Date(); max.setDate(max.getDate()+60)
+  const crumb='<a href="/book/'+esc(business.business_slug)+'">Services</a><span>/</span><span>'+esc(service.name)+'</span>'
+  shell(business,'<section class="booking-hero compact"><p class="booking-kicker">Restaurant</p><h1>'+esc(service.name)+'</h1><p>'+esc(service.description||'Choose a date and available time for your table.')+'</p></section><section class="calendar-panel"><div><label for="bookingDate">Choose a date</label><input id="bookingDate" type="date" min="'+dateValue(today)+'" max="'+dateValue(max)+'" value="'+dateValue(today)+'"><p id="restaurantTimezone" class="timezone"></p></div><div><h2>Available times</h2><div id="availableSlots" class="slot-grid"></div></div></section><form id="publicBookingForm" class="booking-form" hidden><h2>Your details</h2><p id="selectedTime"></p><div class="form-grid"><label>Name<input name="name" required maxlength="200"></label><label>Phone<input name="phone" required maxlength="50"></label><label>Number of guests<input name="quantity" type="number" min="1" value="1" required></label></div><label>Special requests<textarea name="notes" maxlength="2000"></textarea></label><button class="booking-confirm" type="submit">Confirm reservation</button><p id="bookingMessage" role="status"></p></form>',crumb)
+  const date=document.querySelector('#bookingDate'),slots=document.querySelector('#availableSlots'),form=document.querySelector('#publicBookingForm'),timezone=document.querySelector('#restaurantTimezone')
+  let selected=null
+  async function load(){
+    selected=null;form.hidden=true;slots.innerHTML='<p>Checking availability…</p>'
+    const {data,error}=await supabase.rpc('get_public_restaurant_slots',{p_business_slug:business.business_slug,p_local_date:date.value})
+    if(error){slots.innerHTML='<p>Availability could not be loaded.</p>';return}
+    const rows=data||[]
+    timezone.textContent=rows[0]?.timezone?'Times shown in '+rows[0].timezone:''
+    slots.innerHTML=rows.length?rows.map(row=>'<button type="button" class="slot" data-time="'+esc(String(row.reservation_time).slice(0,8))+'" data-capacity="'+row.remaining_capacity+'">'+esc(String(row.reservation_time).slice(0,5))+'<small>'+row.remaining_capacity+' guest'+(row.remaining_capacity===1?'':'s')+' available</small></button>').join(''):'<p>No times available on this date.</p>'
+    slots.querySelectorAll('.slot').forEach(button=>button.onclick=()=>{slots.querySelectorAll('.slot').forEach(item=>item.classList.remove('selected'));button.classList.add('selected');selected={time:button.dataset.time,capacity:Number(button.dataset.capacity)};form.elements.quantity.max=String(selected.capacity);form.elements.quantity.value='1';form.hidden=false;document.querySelector('#selectedTime').textContent=date.value+' at '+button.dataset.time.slice(0,5)})
+  }
+  date.onchange=load
+  form.onsubmit=async event=>{
+    event.preventDefault();if(!selected)return
+    const values=new FormData(form),button=form.querySelector('[type="submit"]'),message=document.querySelector('#bookingMessage'),quantity=Number(values.get('quantity'))
+    if(quantity<1||quantity>selected.capacity){message.textContent='Choose a guest count within the available capacity.';return}
+    button.disabled=true;message.textContent='Confirming…'
+    const {data,error}=await supabase.rpc('create_public_restaurant_reservation',{p_business_slug:business.business_slug,p_customer_name:values.get('name'),p_phone:values.get('phone'),p_reservation_date:date.value,p_reservation_time:selected.time,p_party_size:quantity,p_special_request:values.get('notes')||null,p_custom_data:{}})
+    button.disabled=false
+    if(error){message.textContent=error.message.includes('capacity')||error.message.includes('available')?'That time no longer has enough capacity. Please choose again.':'Reservation could not be completed.';return}
+    form.innerHTML='<div class="booking-success"><p class="booking-kicker">Reservation confirmed</p><h2>Thank you, '+esc(values.get('name'))+'.</h2><p>Your table for '+quantity+' has been reserved.</p><p>Your reference is <strong>'+esc(data)+'</strong>.</p></div>'
+  }
+  load()
 }
 async function scheduledServicePage(business,service){
   const today=new Date(), max=new Date(); max.setDate(max.getDate()+60)
@@ -119,7 +148,8 @@ function setupBookingManager(business){
   function renderManager(){
     const zone=booking.staff_timezone||'UTC'
     const when=new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short',timeZone:zone}).format(new Date(booking.starts_at))
-    result.innerHTML='<div class="manager-current"><p class="booking-kicker">Current booking</p><h3>'+esc(booking.service_name)+'</h3><p>'+esc(when)+' · '+esc(booking.staff_name||'Assigned team member')+'</p><p>Status: '+esc(booking.status)+'</p><div class="manager-actions"><button type="button" id="showReschedule">Reschedule</button><button type="button" class="danger" id="cancelManagedBooking">Cancel booking</button></div><div id="managerOptions"></div><p class="manager-message" id="managerActionMessage" role="status"></p></div>'
+    const provider=booking.booking_kind==='restaurant'?'Restaurant reservation':booking.staff_name||'Assigned team member'
+    result.innerHTML='<div class="manager-current"><p class="booking-kicker">Current booking</p><h3>'+esc(booking.service_name)+'</h3><p>'+esc(when)+' · '+esc(provider)+'</p><p>Status: '+esc(booking.status)+'</p><div class="manager-actions"><button type="button" id="showReschedule">Reschedule</button><button type="button" class="danger" id="cancelManagedBooking">Cancel booking</button></div><div id="managerOptions"></div><p class="manager-message" id="managerActionMessage" role="status"></p></div>'
     document.querySelector('#showReschedule').onclick=showOptions
     document.querySelector('#cancelManagedBooking').onclick=cancelBooking
   }
@@ -131,6 +161,13 @@ function setupBookingManager(business){
   async function loadOptions(){
     const date=document.querySelector('#managerDate'), slots=document.querySelector('#managerSlots')
     slots.innerHTML='<p>Checking availability…</p>'
+    if(booking.booking_kind==='restaurant'){
+      const {data,error}=await supabase.rpc('get_public_restaurant_reschedule_slots',{p_business_slug:business.business_slug,p_reservation_reference:credentials.reference,p_phone:credentials.phone,p_local_date:date.value})
+      if(error){slots.innerHTML='<p>Availability could not be loaded.</p>';return}
+      slots.innerHTML=data?.length?data.map(item=>'<button type="button" class="slot manager-slot" data-restaurant-time="'+esc(String(item.reservation_time).slice(0,8))+'">'+esc(String(item.reservation_time).slice(0,5))+'</button>').join(''):'<p>No alternatives are available on this date.</p>'
+      slots.querySelectorAll('.manager-slot').forEach(button=>button.onclick=()=>reschedule(button))
+      return
+    }
     const {data,error}=await supabase.rpc('get_public_booking_reschedule_options',{p_business_slug:business.business_slug,p_reference:credentials.reference,p_phone:credentials.phone,p_from_date:date.value,p_to_date:date.value})
     if(error){slots.innerHTML='<p>Availability could not be loaded.</p>';return}
     slots.innerHTML=data?.length?data.map(x=>{const zone=x.staff_timezone||booking.staff_timezone||'UTC';const label=new Intl.DateTimeFormat(undefined,{hour:'numeric',minute:'2-digit',timeZone:zone}).format(new Date(x.starts_at));return '<button type="button" class="slot manager-slot" data-start="'+x.starts_at+'" data-session="'+(x.session_id||'')+'">'+esc(label)+'<small>'+esc(x.staff_name||'')+'</small></button>'}).join(''):'<p>No alternatives are available on this date.</p>'
@@ -138,14 +175,20 @@ function setupBookingManager(business){
   }
   async function reschedule(button){
     const status=document.querySelector('#managerActionMessage');status.textContent='Rescheduling…'
-    const {error}=await supabase.rpc('reschedule_public_booking',{p_business_slug:business.business_slug,p_reference:credentials.reference,p_phone:credentials.phone,p_new_starts_at:button.dataset.session?null:button.dataset.start,p_new_session_id:button.dataset.session?Number(button.dataset.session):null})
-    if(error){status.textContent=error.message.includes('available')||error.message.includes('places')?'That option was just taken. Please choose another.':'Booking could not be rescheduled.';return}
+    const params=button.dataset.restaurantTime
+      ? ['reschedule_public_restaurant_reservation',{p_business_slug:business.business_slug,p_reservation_reference:credentials.reference,p_phone:credentials.phone,p_new_date:document.querySelector('#managerDate').value,p_new_time:button.dataset.restaurantTime}]
+      : ['reschedule_public_booking',{p_business_slug:business.business_slug,p_reference:credentials.reference,p_phone:credentials.phone,p_new_starts_at:button.dataset.session?null:button.dataset.start,p_new_session_id:button.dataset.session?Number(button.dataset.session):null}]
+    const {data,error}=await supabase.rpc(params[0],params[1])
+    if(error||data===false){const detail=error?.message||'';status.textContent=detail.includes('available')||detail.includes('places')||detail.includes('capacity')?'That option was just taken. Please choose another.':'Booking could not be rescheduled.';return}
     status.textContent='Booking rescheduled successfully.';form.requestSubmit()
   }
   async function cancelBooking(){
     if(!confirm('Cancel this booking?'))return
     const status=document.querySelector('#managerActionMessage');status.textContent='Cancelling…'
-    const {data,error}=await supabase.rpc('cancel_public_booking',{p_business_slug:business.business_slug,p_reference:credentials.reference,p_phone:credentials.phone})
+    const params=booking.booking_kind==='restaurant'
+      ? ['cancel_public_restaurant_reservation',{p_business_slug:business.business_slug,p_reservation_reference:credentials.reference,p_phone:credentials.phone}]
+      : ['cancel_public_booking',{p_business_slug:business.business_slug,p_reference:credentials.reference,p_phone:credentials.phone}]
+    const {data,error}=await supabase.rpc(params[0],params[1])
     if(error||!data){status.textContent='Booking could not be cancelled.';return}
     result.innerHTML='<div class="booking-success"><h3>Booking cancelled</h3><p>Your booking has been cancelled.</p></div>'
   }
