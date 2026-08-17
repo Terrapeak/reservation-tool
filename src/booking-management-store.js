@@ -1,6 +1,7 @@
 import { supabase } from './supabaseclient.js'
 
 const FINAL_STATUSES = new Set(['completed', 'cancelled', 'no_show'])
+const CANONICAL_ONLY_VERSION = 2
 
 function normalizeCanonicalBooking(row) {
   const startsAt = row.starts_at ? new Date(row.starts_at) : null
@@ -63,48 +64,66 @@ function nextDate(dateValue) {
   return value.toISOString().slice(0, 10)
 }
 
-export async function listManagedBookings({ businessId, startDate, endDate, reference = '', viewMode = 'active' }) {
-  let canonicalQuery = supabase
+async function getBookingModelVersion(businessId) {
+  const { data, error } = await supabase
+    .from('businesses')
+    .select('booking_model_version')
+    .eq('id', businessId)
+    .single()
+
+  if (error) throw error
+  return Number(data?.booking_model_version || 1)
+}
+
+function buildCanonicalQuery({ businessId, startDate, endDate, reference }) {
+  let query = supabase
     .from('bookings')
     .select('*')
     .eq('business_id', businessId)
     .order('starts_at', { ascending: true })
 
-  let legacyQuery = supabase
+  if (reference) return query.eq('reference', reference)
+
+  return query
+    .gte('starts_at', `${startDate}T00:00:00.000Z`)
+    .lt('starts_at', `${nextDate(endDate)}T00:00:00.000Z`)
+}
+
+function buildLegacyQuery({ businessId, startDate, endDate, reference }) {
+  let query = supabase
     .from('reservations')
     .select('*')
     .eq('business_id', businessId)
     .order('reservation_date', { ascending: true })
     .order('reservation_time', { ascending: true })
 
-  if (reference) {
-    canonicalQuery = canonicalQuery.eq('reference', reference)
-    legacyQuery = legacyQuery.eq('reservation_reference', reference)
-  } else {
-    canonicalQuery = canonicalQuery
-      .gte('starts_at', `${startDate}T00:00:00.000Z`)
-      .lt('starts_at', `${nextDate(endDate)}T00:00:00.000Z`)
-    legacyQuery = legacyQuery
-      .gte('reservation_date', startDate)
-      .lte('reservation_date', endDate)
-  }
+  if (reference) return query.eq('reservation_reference', reference)
 
-  const [canonicalResult, legacyResult] = await Promise.all([canonicalQuery, legacyQuery])
+  return query
+    .gte('reservation_date', startDate)
+    .lte('reservation_date', endDate)
+}
+
+export async function listManagedBookings({ businessId, startDate, endDate, reference = '', viewMode = 'active' }) {
+  const bookingModelVersion = await getBookingModelVersion(businessId)
+  const canonicalResult = await buildCanonicalQuery({ businessId, startDate, endDate, reference })
   if (canonicalResult.error) throw canonicalResult.error
-  if (legacyResult.error) throw legacyResult.error
 
   const canonicalRows = (canonicalResult.data || []).map(normalizeCanonicalBooking)
-  const canonicalIds = new Set(canonicalRows.map(row => String(row.id)))
-  const canonicalReferences = new Set(canonicalRows.map(row => row.reference).filter(Boolean))
+  let rows = canonicalRows
 
-  // During migration, keep legacy rows visible only when they have not yet been
-  // represented in the canonical bookings table. This makes the read path safe
-  // across partially migrated businesses without double-counting migrated data.
-  const legacyRows = (legacyResult.data || [])
-    .map(normalizeLegacyReservation)
-    .filter(row => !canonicalIds.has(String(row.id)) && (!row.reference || !canonicalReferences.has(row.reference)))
+  if (bookingModelVersion < CANONICAL_ONLY_VERSION) {
+    const legacyResult = await buildLegacyQuery({ businessId, startDate, endDate, reference })
+    if (legacyResult.error) throw legacyResult.error
 
-  let rows = [...canonicalRows, ...legacyRows]
+    const canonicalIds = new Set(canonicalRows.map(row => String(row.id)))
+    const canonicalReferences = new Set(canonicalRows.map(row => row.reference).filter(Boolean))
+    const legacyRows = (legacyResult.data || [])
+      .map(normalizeLegacyReservation)
+      .filter(row => !canonicalIds.has(String(row.id)) && (!row.reference || !canonicalReferences.has(row.reference)))
+
+    rows = [...canonicalRows, ...legacyRows]
+  }
 
   if (!reference && viewMode === 'active') rows = rows.filter(row => !row.archived)
   if (!reference && viewMode === 'archived') rows = rows.filter(row => row.archived)
