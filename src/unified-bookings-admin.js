@@ -33,32 +33,33 @@ function statusLabel(status) {
   })[status] || status || 'Unknown'
 }
 
-function sourceLabel(row) {
-  return row.source === 'bookings' ? 'Unified booking' : 'Legacy reservation'
-}
-
 async function renderBookings() {
   const canManage = hasCapability('manageBookings')
   document.querySelector('#app').innerHTML = `
-    <main class="legacy-reservations-management">
-      <h1>Bookings</h1>
-      <div class="analytics-filter-panel">
-        <label>Start Date<input type="date" id="adminStartDateFilter" value="${today}"></label>
-        <label>End Date<input type="date" id="adminEndDateFilter" value="${today}"></label>
-        <button id="loadDateButton" type="button">Load Date Range</button>
+    <main class="reservations-management">
+      <header class="management-page-heading">
+        <div><h1>Bookings</h1><p>Search, review and update customer bookings.</p></div>
+      </header>
+      <div class="analytics-filter-panel booking-filter-panel" aria-label="Booking filters">
+        <div class="filter-date-grid">
+          <label>Start date<input type="date" id="adminStartDateFilter" value="${today}"></label>
+          <label>End date<input type="date" id="adminEndDateFilter" value="${today}"></label>
+        </div>
+        <button id="loadDateButton" type="button">Apply dates</button>
       </div>
-      <div>
-        <input id="searchReference" type="text" placeholder="Search by reference number">
+      <div class="booking-search-toolbar" role="search">
+        <label class="sr-only" for="searchReference">Booking reference</label>
+        <input id="searchReference" type="search" placeholder="Search by booking reference" autocomplete="off">
         <button id="searchButton" type="button">Search</button>
-        <button id="refreshButton" type="button">Show All Bookings</button>
+        <button id="refreshButton" type="button">Clear search</button>
       </div>
-      <div>
-        <button id="showActiveButton" type="button">Active</button>
-        <button id="showArchivedButton" type="button">Archived</button>
-        <button id="showAllButton" type="button">All</button>
+      <div class="booking-view-tabs" role="group" aria-label="Booking status view">
+        <button id="showActiveButton" class="active" type="button" aria-pressed="true">Active</button>
+        <button id="showArchivedButton" type="button" aria-pressed="false">Past & cancelled</button>
+        <button id="showAllButton" type="button" aria-pressed="false">All</button>
       </div>
       <div id="dashboardSummary"></div>
-      <div id="adminReservations">Loading bookings...</div>
+      <div id="adminReservations" aria-live="polite">Loading bookings...</div>
     </main>
   `
 
@@ -88,7 +89,7 @@ async function renderBookings() {
     currentRows = rows
     updateSummary(rows)
     if (!rows.length) {
-      target.innerHTML = '<p>No bookings found.</p>'
+      target.innerHTML = '<div class="management-empty-state"><h2>No bookings found</h2><p>Try another date range, status view or booking reference.</p></div>'
       return
     }
 
@@ -98,7 +99,7 @@ async function renderBookings() {
           <h3>${escapeHtml(row.reference || 'No reference')}</h3>
           <p>${escapeHtml(row.customerName)}${row.customerPhone ? ` · ${escapeHtml(row.customerPhone)}` : ''}</p>
           <p>${escapeHtml(row.bookingDate)} ${escapeHtml(row.bookingTime)}</p>
-          <small>${escapeHtml(statusLabel(row.status))} · ${escapeHtml(sourceLabel(row))}${row.archived ? ' · Archived' : ''}</small>
+          <span class="booking-status booking-status-${escapeHtml(row.status)}">${escapeHtml(statusLabel(row.status))}</span>
         </div>
         ${canManage ? `
           <div class="session-actions">
@@ -149,11 +150,30 @@ async function renderBookings() {
   })
 
   document.getElementById('loadDateButton').addEventListener('click', () => loadRows())
-  document.getElementById('refreshButton').addEventListener('click', () => loadRows())
+  document.getElementById('refreshButton').addEventListener('click', () => {
+    document.getElementById('searchReference').value = ''
+    loadRows()
+  })
   document.getElementById('searchButton').addEventListener('click', () => loadRows(document.getElementById('searchReference').value.trim()))
-  document.getElementById('showActiveButton').addEventListener('click', () => { viewMode = 'active'; loadRows() })
-  document.getElementById('showArchivedButton').addEventListener('click', () => { viewMode = 'archived'; loadRows() })
-  document.getElementById('showAllButton').addEventListener('click', () => { viewMode = 'all'; loadRows() })
+  document.getElementById('searchReference').addEventListener('keydown', event => {
+    if (event.key !== 'Enter') return
+    event.preventDefault()
+    loadRows(event.currentTarget.value.trim())
+  })
+  const viewButtons = ['showActiveButton', 'showArchivedButton', 'showAllButton']
+  function selectView(buttonId, mode) {
+    viewMode = mode
+    viewButtons.forEach(id => {
+      const button = document.getElementById(id)
+      const selected = id === buttonId
+      button.classList.toggle('active', selected)
+      button.setAttribute('aria-pressed', String(selected))
+    })
+    loadRows()
+  }
+  document.getElementById('showActiveButton').addEventListener('click', () => selectView('showActiveButton', 'active'))
+  document.getElementById('showArchivedButton').addEventListener('click', () => selectView('showArchivedButton', 'archived'))
+  document.getElementById('showAllButton').addEventListener('click', () => selectView('showAllButton', 'all'))
 
   await loadRows()
 }
@@ -165,12 +185,18 @@ async function renderAnalytics() {
   }
 
   document.querySelector('#app').innerHTML = `
-    <main class="legacy-reservations-management">
-      <h1>Analytics</h1>
-      <label>Start Date<input type="date" id="analyticsStartDate" value="${today}"></label>
-      <label>End Date<input type="date" id="analyticsEndDate" value="${today}"></label>
-      <button id="loadAnalyticsButton" type="button">Load Analytics</button>
-      <div id="analyticsResults"></div>
+    <main class="reservations-management">
+      <header class="management-page-heading">
+        <div><h1>Analytics</h1><p>Review booking volume, attendance and capacity for any date range.</p></div>
+      </header>
+      <div class="analytics-filter-panel booking-filter-panel">
+        <div class="filter-date-grid">
+          <label>Start date<input type="date" id="analyticsStartDate" value="${today}"></label>
+          <label>End date<input type="date" id="analyticsEndDate" value="${today}"></label>
+        </div>
+        <button id="loadAnalyticsButton" type="button">Apply dates</button>
+      </div>
+      <div id="analyticsResults" aria-live="polite"></div>
     </main>
   `
 
@@ -186,8 +212,6 @@ async function renderAnalytics() {
       })
       const count = status => rows.filter(row => row.status === status).length
       const capacity = rows.reduce((sum, row) => sum + Number(row.quantity || 0), 0)
-      const canonical = rows.filter(row => row.source === 'bookings').length
-      const legacy = rows.filter(row => row.source === 'reservations').length
       target.innerHTML = `
         <div class="summary-grid">
           <div class="summary-card"><h3>Total Bookings</h3><p>${rows.length}</p></div>
@@ -196,8 +220,6 @@ async function renderAnalytics() {
           <div class="summary-card"><h3>Completed</h3><p>${count('completed')}</p></div>
           <div class="summary-card"><h3>Cancelled</h3><p>${count('cancelled')}</p></div>
           <div class="summary-card"><h3>No Shows</h3><p>${count('no_show')}</p></div>
-          <div class="summary-card"><h3>Unified Model</h3><p>${canonical}</p></div>
-          <div class="summary-card"><h3>Legacy Records</h3><p>${legacy}</p></div>
         </div>
       `
     } catch (error) {

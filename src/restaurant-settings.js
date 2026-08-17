@@ -43,7 +43,7 @@ async function render() {
   const canManage = hasCapability('manageSettings')
   const { business, profile, branding, settings, service } = context
   document.querySelector('#app').innerHTML = `
-    <main class="legacy-reservations-management">
+    <main class="reservations-management">
       <h1>Settings</h1>${navigation()}
       ${canManage ? '' : '<p class="read-only-notice">Settings are read-only for this TerraPeak role.</p>'}
       <section class="panel"><h2>Business profile</h2><form id="businessProfileForm">
@@ -54,8 +54,8 @@ async function render() {
         <label><input type="checkbox" id="usesCapacity" ${profile.uses_capacity !== false ? 'checked' : ''} ${canManage ? '' : 'disabled'}> Allow group bookings</label>
         ${canManage ? '<button type="submit">Save Business Profile</button>' : ''}
       </form></section>
-      <section class="panel"><h2>Restaurant booking service</h2>
-        ${service ? `<form id="operationalSettingsForm">
+      ${service ? `<section class="panel"><h2>Restaurant booking service</h2>
+        <form id="operationalSettingsForm">
           <label>Opening time<input type="time" id="openingTime" value="${escapeHtml(String(settings.opening_time || '09:00').slice(0, 5))}" ${canManage ? '' : 'disabled'}></label>
           <label>Closing time<input type="time" id="closingTime" value="${escapeHtml(String(settings.closing_time || '17:00').slice(0, 5))}" ${canManage ? '' : 'disabled'}></label>
           <label>Timezone<input id="restaurantTimezone" value="${escapeHtml(settings.timezone || 'Asia/Kuala_Lumpur')}" ${canManage ? '' : 'disabled'}></label>
@@ -63,13 +63,13 @@ async function render() {
           <label>Default duration<input type="number" min="1" id="defaultDurationMinutes" value="${Number(service.duration_minutes || 60)}" ${canManage ? '' : 'disabled'}></label>
           <label>Slot interval<input type="number" min="1" id="slotIntervalMinutes" value="${Number(service.slot_interval_minutes || 30)}" ${canManage ? '' : 'disabled'}></label>
           ${canManage ? '<button type="submit">Save Booking Service</button>' : ''}
-        </form>` : '<p class="error">The canonical restaurant service is not configured. Run Reservations provisioning before accepting bookings.</p>'}
+        </form>
       </section>
       <section class="panel"><h2>Brand settings</h2><form id="brandingForm">
         <label>Display name<input id="restaurantName" value="${escapeHtml(branding.restaurant_name || profile.business_name || business.business_name)}" ${canManage ? '' : 'disabled'}></label>
         <label>Primary color<input type="color" id="primaryColor" value="${escapeHtml(branding.primary_color || '#2f5d50')}" ${canManage ? '' : 'disabled'}></label>
         ${canManage ? '<button type="submit">Save Brand Settings</button>' : ''}
-      </form></section><p id="settingsMessage" role="status"></p>
+      </form></section>` : ''}<p id="settingsMessage" role="status"></p>
     </main>`
 
   if (!canManage) return
@@ -88,7 +88,7 @@ async function render() {
     const settingsResult=await supabase.from('restaurant_settings').update({opening_time:document.querySelector('#openingTime').value,closing_time:document.querySelector('#closingTime').value,timezone:document.querySelector('#restaurantTimezone').value.trim(),max_guests_per_slot:capacity,default_duration_minutes:duration}).eq('business_id',businessId)
     message.textContent=settingsResult.error?settingsResult.error.message:'Restaurant booking service saved.'
   }
-  document.querySelector('#brandingForm').onsubmit = async event => {
+  if (service) document.querySelector('#brandingForm').onsubmit = async event => {
     event.preventDefault()
     const { error } = await supabase.from('restaurant_branding').update({restaurant_name:document.querySelector('#restaurantName').value.trim(),primary_color:document.querySelector('#primaryColor').value}).eq('business_id',businessId)
     message.textContent = error ? error.message : 'Brand settings saved.'

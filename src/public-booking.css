@@ -66,3 +66,19 @@ body.public-booking-page .booking-shell .slot.selected{
   background:#285b3b!important;
   color:#fff!important;
 }
+body.public-booking-page :is(a,button,input,textarea,summary):focus-visible{
+  outline:3px solid rgba(40,91,59,.28);
+  outline-offset:3px;
+}
+@media(max-width:700px){
+  .booking-shell{padding-top:14px;padding-bottom:42px}
+  .booking-header{padding:14px 16px}
+  .booking-hero{padding:34px 4px 26px}
+  .booking-hero h1,.booking-profile h1{font-size:clamp(2rem,11vw,3rem)}
+  .booking-profile{align-items:flex-start;flex-direction:column;padding:22px}
+  .calendar-panel,.booking-form{padding:20px}
+  .booking-manager{padding:0 20px 20px}
+  .calendar-panel input,.booking-form input,.booking-form textarea,
+  #managerOptions input{min-height:46px;box-sizing:border-box;width:100%}
+  .slot,.manager-lookup button,.manager-actions button{min-height:44px}
+}

@@ -112,11 +112,12 @@ function renderUnifiedShell(root) {
   const shell = document.createElement('main')
   shell.className = 'reservations-management-shell'
   shell.innerHTML = `
+    <span class="admin-nav reservations-admin-style-marker" hidden aria-hidden="true"></span>
     <header class="reservations-shell-header">
       <div>
         <p class="reservations-shell-eyebrow">TerraPeak Reservations</p>
-        <h1>${businessName}</h1>
-        <p>${pageTitle}</p>
+        <h1>${pageTitle}</h1>
+        <p>${businessName}</p>
       </div>
     </header>
     <nav class="reservations-shell-nav" aria-label="Reservations">

@@ -3,6 +3,10 @@
   max-width: none;
 }
 
+.reservations-admin-style-marker {
+  display: none !important;
+}
+
 .reservations-management-shell {
   width: 100%;
   min-height: 100%;
@@ -15,14 +19,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 22px 24px 16px;
+  padding: 18px 20px 14px;
   border-bottom: 1px solid #e2e8f0;
   background: #fff;
 }
 
 .reservations-shell-header h1 {
-  margin: 2px 0 4px;
-  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  margin: 2px 0 3px;
+  font-size: clamp(1.25rem, 2vw, 1.65rem);
   line-height: 1.2;
 }
 
@@ -70,7 +74,7 @@
 }
 
 .reservations-shell-content {
-  padding: 20px;
+  padding: 18px 20px 28px;
 }
 
 .reservations-shell-content > .brand-logo,
