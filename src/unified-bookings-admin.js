@@ -1,6 +1,5 @@
 import {
   listManagedBookings,
-  setLegacyBookingArchived,
   updateManagedBookingStatus
 } from './booking-management-store.js'
 
@@ -104,9 +103,6 @@ async function renderBookings() {
         ${canManage ? `
           <div class="session-actions">
             ${['pending', 'confirmed'].includes(row.status) ? `<button type="button" data-action="completed" data-key="${escapeHtml(`${row.source}:${row.id}`)}">Complete</button><button type="button" data-action="no_show" data-key="${escapeHtml(`${row.source}:${row.id}`)}">No show</button><button type="button" data-action="cancelled" data-key="${escapeHtml(`${row.source}:${row.id}`)}">Cancel</button>` : ''}
-            ${row.archiveSupported ? (row.archived
-              ? `<button type="button" data-action="restore" data-key="${escapeHtml(`${row.source}:${row.id}`)}">Restore</button>`
-              : `<button type="button" data-action="archive" data-key="${escapeHtml(`${row.source}:${row.id}`)}">Archive</button>`) : ''}
           </div>
         ` : ''}
       </article>
@@ -136,14 +132,8 @@ async function renderBookings() {
     if (!booking) return
 
     const action = button.dataset.action
-    let result
-    if (['completed', 'no_show', 'cancelled'].includes(action)) {
-      result = await updateManagedBookingStatus(booking, action)
-    } else if (action === 'archive') {
-      result = await setLegacyBookingArchived(booking, true)
-    } else if (action === 'restore') {
-      result = await setLegacyBookingArchived(booking, false)
-    }
+    if (!['completed', 'no_show', 'cancelled'].includes(action)) return
+    const result = await updateManagedBookingStatus(booking, action)
 
     if (result?.error) return window.alert(result.error.message)
     await loadRows()
