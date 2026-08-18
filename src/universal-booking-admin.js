@@ -140,12 +140,17 @@ async function startUniversalBookingAdmin() {
 }
 
 async function renderServices(business, access) {
-  const { data: services, error } = await supabase
-    .from('services')
-    .select('*')
-    .eq('business_id', business.id)
-    .order('name')
+  const [{ data: services, error }, { data: staff, error: staffError }, { data: enrollments, error: enrollmentError }] = await Promise.all([
+    supabase.from('services').select('*').eq('business_id', business.id).eq('is_active', true).order('name'),
+    supabase.from('staff_members').select('id, display_name, timezone').eq('business_id', business.id).eq('is_active', true).order('display_name'),
+    supabase.from('class_enrollments').select('service_id, quantity, status').eq('business_id', business.id).in('status', ['pending', 'confirmed'])
+  ])
   if (error) throw error
+  if (staffError) throw staffError
+  if (enrollmentError) throw enrollmentError
+  const enrolledByService = enrollments.reduce((totals, item) => ({ ...totals, [item.service_id]: (totals[item.service_id] || 0) + item.quantity }), {})
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const teacherOptions = staff.map(person => `<option value="${person.id}">${escapeHtml(person.display_name)} (${escapeHtml(person.timezone)})</option>`).join('')
 
   document.getElementById('universalBookingContent').innerHTML = `
     <div class="universal-grid">
@@ -158,13 +163,15 @@ async function renderServices(business, access) {
                 <h3>${escapeHtml(service.name)}</h3>
                 <p>${escapeHtml(service.booking_type)} · ${service.duration_minutes} minutes · ${servicePrice(service)}</p>
                 <small>${service.scheduling_mode === 'scheduled' ? 'Scheduled sessions' : 'Generated from staff availability'}</small>
-                ${access.canManageServices ? `<div class="entity-links"><a href="/${businessSlug}/dashboard/staff?customerView=1">Assign team</a>${service.scheduling_mode === 'scheduled' ? `<a href="/${businessSlug}/dashboard/schedule?customerView=1">Add class times</a>` : `<a href="/${businessSlug}/dashboard/availability?customerView=1">Set availability</a>`}</div>` : ''}
+                ${service.enrollment_mode === 'cohort' ? `<small>${enrolledByService[service.id] || 0} of ${service.capacity} enrolled · ${Math.max(service.capacity - (enrolledByService[service.id] || 0), 0)} places left</small>` : ''}
+                ${access.canManageServices ? `<div class="entity-links"><button type="button" class="link-button edit-service" data-id="${service.id}">Edit</button>${service.scheduling_mode === 'scheduled' ? `<a href="/${businessSlug}/dashboard/schedule?customerView=1">Manage timetable</a>` : `<a href="/${businessSlug}/dashboard/availability?customerView=1">Set availability</a>`}<button type="button" class="link-button danger-text remove-service" data-id="${service.id}">Remove</button></div>` : ''}
               </div>
               <span class="status ${service.is_published ? 'published' : ''}">${service.is_published ? 'Published' : 'Draft'}</span>
             </article>
           `).join('') : '<p class="empty-copy">No services have been created yet.</p>'}
         </div>
       </section>
+      <section id="serviceEditPanel" class="panel" hidden></section>
       <section class="panel">
         <p class="eyebrow">New offering</p><h2>Create a service</h2>
         ${access.canManageServices ? `
@@ -179,6 +186,14 @@ async function renderServices(business, access) {
             <div class="form-row"><label>Slot interval<input id="slotInterval" type="number" min="5" value="30" required></label><label>Capacity<input id="serviceCapacity" type="number" min="1" value="1" required></label></div>
             <div class="form-row"><label>Price<input id="servicePrice" type="number" min="0" step="0.01"></label><label>Currency<input id="serviceCurrency" maxlength="3" value="MYR" required></label></div>
             <div class="form-row"><label>Price covers how many sessions<input id="servicePriceSessions" type="number" min="1" value="1" required></label><label>Package validity (days, optional)<input id="servicePackageValidity" type="number" min="1"></label></div>
+            <fieldset id="cohortSetup" class="cohort-setup" hidden>
+              <legend>Class timetable and enrolment</legend>
+              <div class="form-row"><label>Class starts<input id="cohortStartDate" type="date"></label><label>Schedule length<select id="cohortEndMode"><option value="date">End date</option><option value="weeks">Number of weeks</option><option value="open">Open-ended</option></select></label></div>
+              <div class="form-row" id="cohortEndDateRow"><label>Class ends<input id="cohortEndDate" type="date"></label></div>
+              <div class="form-row" id="cohortWeeksRow" hidden><label>Number of weeks<input id="cohortWeeks" type="number" min="1" max="260" value="12"></label></div>
+              <p class="form-help">Each enabled day becomes an individual class occurrence. Teachers are checked for timetable conflicts before anything is saved.</p>
+              <div class="class-day-grid">${dayNames.map((day, index) => `<div class="class-day-row"><label class="check-label"><input class="class-day-enabled" type="checkbox" data-day="${index}"> ${day}</label><input class="class-day-start" data-day="${index}" type="time" value="09:00" aria-label="${day} starts"><input class="class-day-end" data-day="${index}" type="time" value="10:00" aria-label="${day} ends"><select class="class-day-staff" data-day="${index}" aria-label="${day} teacher"><option value="">Select teacher</option>${teacherOptions}</select></div>`).join('')}</div>
+            </fieldset>
             <label class="check-label"><input id="servicePublished" type="checkbox"> Publish on the customer page</label>
             <button type="submit">Create service</button>
           </form>
@@ -186,6 +201,22 @@ async function renderServices(business, access) {
       </section>
     </div>
   `
+
+  const serviceType = document.getElementById('serviceType')
+  const schedulingMode = document.getElementById('serviceSchedulingMode')
+  const cohortSetup = document.getElementById('cohortSetup')
+  function refreshCohortSetup() {
+    const isClass = ['class', 'course'].includes(serviceType.value)
+    if (isClass) schedulingMode.value = 'scheduled'
+    cohortSetup.hidden = !(isClass && schedulingMode.value === 'scheduled')
+  }
+  serviceType?.addEventListener('change', refreshCohortSetup)
+  schedulingMode?.addEventListener('change', refreshCohortSetup)
+  refreshCohortSetup()
+  document.getElementById('cohortEndMode')?.addEventListener('change', event => {
+    document.getElementById('cohortEndDateRow').hidden = event.target.value !== 'date'
+    document.getElementById('cohortWeeksRow').hidden = event.target.value !== 'weeks'
+  })
 
   document.getElementById('serviceForm')?.addEventListener('submit', async event => {
     event.preventDefault()
@@ -206,11 +237,65 @@ async function renderServices(business, access) {
       currency: document.getElementById('serviceCurrency').value.toUpperCase(),
       is_published: document.getElementById('servicePublished').checked
     }
-    const { error: insertError } = await supabase.from('services').insert(payload)
-    if (insertError) return showMessage(insertError.message, 'error')
-    showMessage(`${name} was created. Next, assign its team member and configure its ${payload.scheduling_mode === 'scheduled' ? 'class times' : 'availability'}.`)
+    let insertError
+    if (!cohortSetup.hidden) {
+      const schedule = [...document.querySelectorAll('.class-day-enabled:checked')].map(input => {
+        const day = input.dataset.day
+        return {
+          day_of_week: Number(day),
+          starts_at: document.querySelector(`.class-day-start[data-day="${day}"]`).value,
+          ends_at: document.querySelector(`.class-day-end[data-day="${day}"]`).value,
+          staff_id: Number(document.querySelector(`.class-day-staff[data-day="${day}"]`).value)
+        }
+      })
+      const invalid = schedule.find(item => !item.staff_id || !item.starts_at || !item.ends_at || item.ends_at <= item.starts_at)
+      if (!schedule.length) return showMessage('Select at least one class day.', 'error')
+      if (invalid) return showMessage(`${dayNames[invalid.day_of_week]} needs a teacher and a valid start/end time.`, 'error')
+      const endMode = document.getElementById('cohortEndMode').value
+      const { error } = await supabase.rpc('create_class_service_setup', {
+        p_business_id: business.id, p_name: name, p_slug: payload.slug,
+        p_description: payload.description, p_booking_type: payload.booking_type,
+        p_capacity: payload.capacity, p_price: payload.price, p_currency: payload.currency,
+        p_price_session_count: payload.price_session_count, p_package_validity_days: payload.package_validity_days,
+        p_start_date: document.getElementById('cohortStartDate').value || null,
+        p_end_date: endMode === 'date' ? document.getElementById('cohortEndDate').value || null : null,
+        p_number_of_weeks: endMode === 'weeks' ? Number(document.getElementById('cohortWeeks').value) : null,
+        p_open_ended: endMode === 'open', p_is_published: payload.is_published, p_schedule: schedule
+      })
+      insertError = error
+    } else {
+      const result = await supabase.from('services').insert(payload)
+      insertError = result.error
+    }
+    if (insertError) return showMessage(insertError.code === '23505' || insertError.message.includes('already exists') || insertError.message.includes('duplicate key') ? `A service named "${name}" already exists. Edit the existing service or choose another name.` : insertError.message, 'error')
+    showMessage(`${name} and its complete timetable were created.`)
     await renderServices(business, access)
   })
+
+  document.querySelectorAll('.edit-service').forEach(button => button.addEventListener('click', () => {
+    const service = services.find(item => item.id === Number(button.dataset.id))
+    const panel = document.getElementById('serviceEditPanel')
+    panel.hidden = false
+    panel.innerHTML = `<p class="eyebrow">Edit offering</p><h2>${escapeHtml(service.name)}</h2><form id="editServiceForm" class="stacked-form"><label>Name<input id="editServiceName" value="${escapeHtml(service.name)}" required></label><label>Description<textarea id="editServiceDescription" rows="3">${escapeHtml(service.description || '')}</textarea></label><div class="form-row"><label>Capacity<input id="editServiceCapacity" type="number" min="1" value="${service.capacity}" required></label><label>Price<input id="editServicePrice" type="number" min="0" step="0.01" value="${service.price ?? ''}"></label></div><div class="form-row"><label>Price covers sessions<input id="editServicePriceSessions" type="number" min="1" value="${service.price_session_count || 1}"></label><label>Package validity days<input id="editServiceValidity" type="number" min="1" value="${service.package_validity_days || ''}"></label></div><label class="check-label"><input id="editServicePublished" type="checkbox" ${service.is_published ? 'checked' : ''}> Published</label><div class="form-actions"><button type="submit">Save changes</button><button type="button" class="secondary-button" id="closeServiceEdit">Cancel</button></div></form>`
+    document.getElementById('closeServiceEdit').onclick = () => { panel.hidden = true }
+    document.getElementById('editServiceForm').onsubmit = async event => {
+      event.preventDefault()
+      const newName = document.getElementById('editServiceName').value.trim()
+      const newCapacity = Number(document.getElementById('editServiceCapacity').value)
+      if (newCapacity < (enrolledByService[service.id] || 0)) return showMessage(`Capacity cannot be lower than the ${enrolledByService[service.id]} current enrolments.`, 'error')
+      const { error } = await supabase.from('services').update({ name: newName, slug: toSlug(newName), description: document.getElementById('editServiceDescription').value.trim() || null, capacity: newCapacity, price: document.getElementById('editServicePrice').value || null, price_session_count: Number(document.getElementById('editServicePriceSessions').value), package_validity_days: document.getElementById('editServiceValidity').value || null, is_published: document.getElementById('editServicePublished').checked }).eq('id', service.id)
+      if (error) return showMessage(error.code === '23505' ? `A service named "${newName}" already exists. Edit the existing service or choose another name.` : error.message, 'error')
+      showMessage(`${newName} was updated.`); await renderServices(business, access)
+    }
+  }))
+
+  document.querySelectorAll('.remove-service').forEach(button => button.addEventListener('click', async () => {
+    const service = services.find(item => item.id === Number(button.dataset.id))
+    if (!window.confirm(`Remove ${service.name}? Used services are archived so their history remains available.`)) return
+    const { data, error } = await supabase.rpc('remove_or_archive_service', { p_service_id: service.id })
+    if (error) return showMessage(error.message, 'error')
+    showMessage(`${service.name} was ${data}.`); await renderServices(business, access)
+  }))
 }
 
 async function renderStaff(business, access) {
