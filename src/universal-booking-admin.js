@@ -50,6 +50,13 @@ function money(value, currency = 'MYR') {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(Number(value))
 }
 
+function servicePrice(service, value = service.price) {
+  const formatted = money(value, service.currency)
+  return Number(service.price_session_count || 1) > 1
+    ? `${formatted} for ${service.price_session_count} sessions`
+    : formatted
+}
+
 function dateTimeInZone(value, timezone) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
@@ -149,8 +156,9 @@ async function renderServices(business, access) {
             <article class="entity-card">
               <div>
                 <h3>${escapeHtml(service.name)}</h3>
-                <p>${escapeHtml(service.booking_type)} · ${service.duration_minutes} minutes · ${money(service.price, service.currency)}</p>
+                <p>${escapeHtml(service.booking_type)} · ${service.duration_minutes} minutes · ${servicePrice(service)}</p>
                 <small>${service.scheduling_mode === 'scheduled' ? 'Scheduled sessions' : 'Generated from staff availability'}</small>
+                ${access.canManageServices ? `<div class="entity-links"><a href="/${businessSlug}/dashboard/staff?customerView=1">Assign team</a>${service.scheduling_mode === 'scheduled' ? `<a href="/${businessSlug}/dashboard/schedule?customerView=1">Add class times</a>` : `<a href="/${businessSlug}/dashboard/availability?customerView=1">Set availability</a>`}</div>` : ''}
               </div>
               <span class="status ${service.is_published ? 'published' : ''}">${service.is_published ? 'Published' : 'Draft'}</span>
             </article>
@@ -170,6 +178,7 @@ async function renderServices(business, access) {
             <label>Scheduling method<select id="serviceSchedulingMode"><option value="generated">Generate from staff availability</option><option value="scheduled">Use scheduled sessions</option></select></label>
             <div class="form-row"><label>Slot interval<input id="slotInterval" type="number" min="5" value="30" required></label><label>Capacity<input id="serviceCapacity" type="number" min="1" value="1" required></label></div>
             <div class="form-row"><label>Price<input id="servicePrice" type="number" min="0" step="0.01"></label><label>Currency<input id="serviceCurrency" maxlength="3" value="MYR" required></label></div>
+            <div class="form-row"><label>Price covers how many sessions<input id="servicePriceSessions" type="number" min="1" value="1" required></label><label>Package validity (days, optional)<input id="servicePackageValidity" type="number" min="1"></label></div>
             <label class="check-label"><input id="servicePublished" type="checkbox"> Publish on the customer page</label>
             <button type="submit">Create service</button>
           </form>
@@ -192,12 +201,14 @@ async function renderServices(business, access) {
       slot_interval_minutes: Number(document.getElementById('slotInterval').value),
       capacity: Number(document.getElementById('serviceCapacity').value),
       price: document.getElementById('servicePrice').value || null,
+      price_session_count: Number(document.getElementById('servicePriceSessions').value),
+      package_validity_days: document.getElementById('servicePackageValidity').value || null,
       currency: document.getElementById('serviceCurrency').value.toUpperCase(),
       is_published: document.getElementById('servicePublished').checked
     }
     const { error: insertError } = await supabase.from('services').insert(payload)
     if (insertError) return showMessage(insertError.message, 'error')
-    showMessage(`${name} was created.`)
+    showMessage(`${name} was created. Next, assign its team member and configure its ${payload.scheduling_mode === 'scheduled' ? 'class times' : 'availability'}.`)
     await renderServices(business, access)
   })
 }
@@ -239,13 +250,12 @@ async function renderStaff(business, access) {
               <button type="submit">Create staff member</button>
             </form>` : '<p>This TerraPeak role has read-only team access.</p>'}
         </section>
-        <section class="panel"><p class="eyebrow">Capabilities</p><h2>Assign a service</h2>
+        <section class="panel"><p class="eyebrow">Capabilities</p><h2>Assign subjects or services</h2>
           ${access.canManageTeam && staff.length && services.length ? `
             <form id="assignmentForm" class="stacked-form">
               <label>Staff<select id="assignmentStaff">${staff.map(person => `<option value="${person.id}">${escapeHtml(person.display_name)}</option>`).join('')}</select></label>
-              <label>Service<select id="assignmentService">${services.map(service => `<option value="${service.id}">${escapeHtml(service.name)}</option>`).join('')}</select></label>
-              <div class="form-row"><label>Custom duration<input id="assignmentDuration" type="number" min="5"></label><label>Custom price<input id="assignmentPrice" type="number" min="0" step="0.01"></label></div>
-              <button type="submit">Assign service</button>
+              <fieldset class="service-checkboxes"><legend>Subjects or services this person can provide</legend>${services.map(service => `<label class="check-label"><input class="assignment-service" type="checkbox" value="${service.id}"> ${escapeHtml(service.name)}</label>`).join('')}</fieldset>
+              <button type="submit">Save assignments</button>
             </form>` : '<p>Service assignments require team-management permission.</p>'}
         </section>
       </div>
@@ -268,17 +278,33 @@ async function renderStaff(business, access) {
     await renderStaff(business, access)
   })
 
+  const assignmentStaff = document.getElementById('assignmentStaff')
+  function loadStaffAssignments() {
+    if (!assignmentStaff) return
+    const staffId = Number(assignmentStaff.value)
+    const selected = new Set(assignments.filter(item => item.staff_id === staffId).map(item => item.service_id))
+    document.querySelectorAll('.assignment-service').forEach(input => { input.checked = selected.has(Number(input.value)) })
+  }
+  assignmentStaff?.addEventListener('change', loadStaffAssignments)
+  loadStaffAssignments()
+
   document.getElementById('assignmentForm')?.addEventListener('submit', async event => {
     event.preventDefault()
-    const { error } = await supabase.from('staff_services').upsert({
-      staff_id: Number(document.getElementById('assignmentStaff').value),
-      service_id: Number(document.getElementById('assignmentService').value),
-      custom_duration_minutes: document.getElementById('assignmentDuration').value || null,
-      custom_price: document.getElementById('assignmentPrice').value || null,
-      is_active: true
+    const staffId = Number(assignmentStaff.value)
+    const selectedIds = new Set([...document.querySelectorAll('.assignment-service:checked')].map(input => Number(input.value)))
+    const payload = services.map(service => {
+      const existing = assignments.find(item => item.staff_id === staffId && item.service_id === service.id)
+      return {
+        staff_id: staffId,
+        service_id: service.id,
+        custom_duration_minutes: existing?.custom_duration_minutes ?? null,
+        custom_price: existing?.custom_price ?? null,
+        is_active: selectedIds.has(service.id)
+      }
     })
+    const { error } = await supabase.from('staff_services').upsert(payload)
     if (error) return showMessage(error.message, 'error')
-    showMessage('Service assignment saved.')
+    showMessage('Staff service assignments saved.')
     await renderStaff(business, access)
   })
 }
@@ -449,12 +475,14 @@ async function renderSchedule(business, access) {
 }
 
 async function renderAvailability(business, access) {
-  const [{ data: staff, error: staffError }, { data: services, error: servicesError }] = await Promise.all([
+  const [{ data: staff, error: staffError }, { data: services, error: servicesError }, { data: assignments, error: assignmentsError }] = await Promise.all([
     supabase.from('staff_members').select('id, display_name, user_id, timezone').eq('business_id', business.id).eq('is_active', true).order('display_name'),
-    supabase.from('services').select('id, name').eq('business_id', business.id).eq('is_active', true).order('name')
+    supabase.from('services').select('id, name').eq('business_id', business.id).eq('is_active', true).order('name'),
+    supabase.from('staff_services').select('staff_id, service_id').eq('is_active', true)
   ])
   if (staffError) throw staffError
   if (servicesError) throw servicesError
+  if (assignmentsError) throw assignmentsError
 
   const manageableStaff = access.canManageAvailability
     ? staff
@@ -490,6 +518,15 @@ async function renderAvailability(business, access) {
   `
 
   if (!manageableStaff.length) return
+
+  function refreshServiceOptions(staffSelectId, serviceSelectId) {
+    const staffId = Number(document.getElementById(staffSelectId).value)
+    const eligible = new Set(assignments.filter(item => item.staff_id === staffId).map(item => item.service_id))
+    const select = document.getElementById(serviceSelectId)
+    const previous = select.value
+    select.innerHTML = `<option value="">All assigned services</option>${services.filter(service => eligible.has(service.id)).map(service => `<option value="${service.id}">${escapeHtml(service.name)}</option>`).join('')}`
+    if ([...select.options].some(option => option.value === previous)) select.value = previous
+  }
 
   function wirePeriodRow(row) {
     row.querySelector('.remove-period').addEventListener('click', () => {
@@ -534,7 +571,10 @@ async function renderAvailability(business, access) {
     })
   }
 
-  document.getElementById('availabilityStaff').addEventListener('change', loadWeeklySchedule)
+  document.getElementById('availabilityStaff').addEventListener('change', () => {
+    refreshServiceOptions('availabilityStaff', 'availabilityService')
+    loadWeeklySchedule()
+  })
   document.getElementById('availabilityService').addEventListener('change', loadWeeklySchedule)
   document.getElementById('availabilityForm').addEventListener('submit', async event => {
     event.preventDefault()
@@ -596,7 +636,12 @@ async function renderAvailability(business, access) {
     showMessage('Calendar exception added.')
     await loadExceptions()
   })
-  document.getElementById('exceptionStaff').addEventListener('change', loadExceptions)
+  document.getElementById('exceptionStaff').addEventListener('change', () => {
+    refreshServiceOptions('exceptionStaff', 'exceptionService')
+    loadExceptions()
+  })
+  refreshServiceOptions('availabilityStaff', 'availabilityService')
+  refreshServiceOptions('exceptionStaff', 'exceptionService')
   await loadWeeklySchedule()
   await loadExceptions()
 }

@@ -54,6 +54,7 @@ function buildNavigation(activeRoute) {
     ['Bookings', base],
     ['Services', `${base}/services`],
     ['Team & Resources', `${base}/staff`],
+    ['Class Schedule', `${base}/schedule`],
     ['Availability', `${base}/availability`],
     ['Analytics', `${base}/analytics`],
     ['Settings', `${base}/settings`]
