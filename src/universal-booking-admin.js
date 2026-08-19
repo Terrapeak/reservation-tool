@@ -140,21 +140,33 @@ async function startUniversalBookingAdmin() {
 }
 
 async function renderServices(business, access) {
-  const [{ data: services, error }, { data: staff, error: staffError }, { data: enrollments, error: enrollmentError }, { data: staffSubjects, error: subjectError }, { data: schedulePatterns, error: patternsError }] = await Promise.all([
+  const [{ data: services, error }, { data: staff, error: staffError }, { data: enrollments, error: enrollmentError }, { data: staffSubjects, error: subjectError }, { data: schedulePatterns, error: patternsError }, { data: weeklyRules, error: rulesError }] = await Promise.all([
     supabase.from('services').select('*').eq('business_id', business.id).eq('is_active', true).order('name'),
-    supabase.from('staff_members').select('id, display_name, timezone').eq('business_id', business.id).eq('is_active', true).order('display_name'),
+    supabase.from('staff_members').select('id, display_name, timezone, is_published').eq('business_id', business.id).eq('is_active', true).order('display_name'),
     supabase.from('class_enrollments').select('service_id, quantity, status').eq('business_id', business.id).in('status', ['pending', 'confirmed']),
     supabase.from('staff_subjects').select('staff_id, subject').eq('business_id', business.id),
-    supabase.from('service_schedule_patterns').select('id, service_id, staff_id, day_of_week, starts_at, ends_at').eq('business_id', business.id).eq('is_active', true).order('day_of_week')
+    supabase.from('service_schedule_patterns').select('id, service_id, staff_id, day_of_week, starts_at, ends_at').eq('business_id', business.id).eq('is_active', true).order('day_of_week'),
+    supabase.from('availability_rules').select('staff_id, service_id, day_of_week, start_time, end_time, is_active').eq('business_id', business.id).eq('is_active', true)
   ])
   if (error) throw error
   if (staffError) throw staffError
   if (enrollmentError) throw enrollmentError
   if (subjectError) throw subjectError
   if (patternsError) throw patternsError
+  if (rulesError) throw rulesError
   const enrolledByService = enrollments.reduce((totals, item) => ({ ...totals, [item.service_id]: (totals[item.service_id] || 0) + item.quantity }), {})
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   const subjects = [...new Set([...staffSubjects.map(item => item.subject), ...services.map(item => item.subject).filter(Boolean)])].sort()
+  const staffMap = Object.fromEntries(staff.map(person => [person.id, person]))
+  function publicationIssues(service) {
+    if (service.enrollment_mode !== 'cohort') return []
+    const patterns = schedulePatterns.filter(item => item.service_id === service.id)
+    const issues = []
+    if (!patterns.length) issues.push('No timetable')
+    if (patterns.some(pattern => !staffMap[pattern.staff_id]?.is_published)) issues.push('Teacher profile not published')
+    if (patterns.some(pattern => !weeklyRules.some(rule => rule.staff_id === pattern.staff_id && rule.day_of_week === pattern.day_of_week && (!rule.service_id || rule.service_id === service.id) && rule.start_time <= pattern.starts_at && rule.end_time >= pattern.ends_at))) issues.push('Outside weekly availability')
+    return issues
+  }
 
   document.getElementById('universalBookingContent').innerHTML = `
     <div class="universal-grid">
@@ -168,6 +180,7 @@ async function renderServices(business, access) {
                 <p>${escapeHtml(service.booking_type)} · ${service.duration_minutes} minutes · ${servicePrice(service)}</p>
                 <small>${service.scheduling_mode === 'scheduled' ? 'Scheduled sessions' : 'Generated from staff availability'}</small>
                 ${service.enrollment_mode === 'cohort' ? `<small>${enrolledByService[service.id] || 0} of ${service.capacity} enrolled · ${Math.max(service.capacity - (enrolledByService[service.id] || 0), 0)} places left</small>` : ''}
+                ${publicationIssues(service).length ? `<small class="error">Not ready for customers: ${escapeHtml(publicationIssues(service).join(' · '))}</small>` : service.enrollment_mode === 'cohort' ? '<small>Ready for customers</small>' : ''}
                 ${access.canManageServices ? `<div class="entity-links"><button type="button" class="link-button edit-service" data-id="${service.id}">Edit</button>${service.scheduling_mode === 'scheduled' ? `<a href="/${businessSlug}/dashboard/schedule?customerView=1">Manage timetable</a>` : `<a href="/${businessSlug}/dashboard/availability?customerView=1">Set availability</a>`}<button type="button" class="link-button danger-text remove-service" data-id="${service.id}">Remove</button></div>` : ''}
               </div>
               <span class="status ${service.is_published ? 'published' : ''}">${service.is_published ? 'Published' : 'Draft'}</span>

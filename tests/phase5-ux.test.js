@@ -58,3 +58,12 @@ test('cohort service editing includes the complete future timetable', async () =
   assert.match(migration, /future class already has bookings/i)
   assert.match(migration, /private\.materialize_cohort_sessions/)
 })
+
+test('published class timetables require visible and available teachers', async () => {
+  const source = await read('../src/universal-booking-admin.js')
+  const migration = await read('../supabase/migrations/20260819061000_class_publication_and_availability_guards.sql')
+  assert.match(source, /Not ready for customers/)
+  assert.match(source, /Outside weekly availability/)
+  assert.match(migration, /Publish every selected teacher profile/)
+  assert.match(migration, /outside the teacher''s weekly availability/)
+})
