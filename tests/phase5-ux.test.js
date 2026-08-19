@@ -45,3 +45,16 @@ test('restaurant-only settings are rendered only when a restaurant service exist
   assert.match(source, /\$\{service \? `<section class="panel"><h2>Restaurant booking service/)
   assert.match(source, /if \(service\) document\.querySelector\('#brandingForm'\)/)
 })
+
+test('cohort service editing includes the complete future timetable', async () => {
+  const source = await read('../src/universal-booking-admin.js')
+  const runtime = await read('../src/trusted-management-runtime.js')
+  const migration = await read('../supabase/migrations/20260819050441_full_cohort_service_editing.sql')
+
+  assert.match(source, /edit-class-day-enabled/)
+  assert.match(source, /editScheduleApplyFrom/)
+  assert.match(source, /update_class_service_setup_v2/)
+  assert.match(runtime, /update_class_service_setup_v2:\s*'manageServices'/)
+  assert.match(migration, /future class already has bookings/i)
+  assert.match(migration, /private\.materialize_cohort_sessions/)
+})

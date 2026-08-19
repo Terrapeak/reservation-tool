@@ -140,16 +140,18 @@ async function startUniversalBookingAdmin() {
 }
 
 async function renderServices(business, access) {
-  const [{ data: services, error }, { data: staff, error: staffError }, { data: enrollments, error: enrollmentError }, { data: staffSubjects, error: subjectError }] = await Promise.all([
+  const [{ data: services, error }, { data: staff, error: staffError }, { data: enrollments, error: enrollmentError }, { data: staffSubjects, error: subjectError }, { data: schedulePatterns, error: patternsError }] = await Promise.all([
     supabase.from('services').select('*').eq('business_id', business.id).eq('is_active', true).order('name'),
     supabase.from('staff_members').select('id, display_name, timezone').eq('business_id', business.id).eq('is_active', true).order('display_name'),
     supabase.from('class_enrollments').select('service_id, quantity, status').eq('business_id', business.id).in('status', ['pending', 'confirmed']),
-    supabase.from('staff_subjects').select('staff_id, subject').eq('business_id', business.id)
+    supabase.from('staff_subjects').select('staff_id, subject').eq('business_id', business.id),
+    supabase.from('service_schedule_patterns').select('id, service_id, staff_id, day_of_week, starts_at, ends_at').eq('business_id', business.id).eq('is_active', true).order('day_of_week')
   ])
   if (error) throw error
   if (staffError) throw staffError
   if (enrollmentError) throw enrollmentError
   if (subjectError) throw subjectError
+  if (patternsError) throw patternsError
   const enrolledByService = enrollments.reduce((totals, item) => ({ ...totals, [item.service_id]: (totals[item.service_id] || 0) + item.quantity }), {})
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   const subjects = [...new Set([...staffSubjects.map(item => item.subject), ...services.map(item => item.subject).filter(Boolean)])].sort()
@@ -301,18 +303,50 @@ async function renderServices(business, access) {
 
   document.querySelectorAll('.edit-service').forEach(button => button.addEventListener('click', () => {
     const service = services.find(item => item.id === Number(button.dataset.id))
+    const isCohort = service.enrollment_mode === 'cohort'
+    const patterns = schedulePatterns.filter(item => item.service_id === service.id)
     const panel = document.getElementById('serviceEditPanel')
     panel.hidden = false
-    panel.innerHTML = `<p class="eyebrow">Edit offering</p><h2>${escapeHtml(service.name)}</h2><form id="editServiceForm" class="stacked-form"><label>Name<input id="editServiceName" value="${escapeHtml(service.name)}" required></label><label>Subject<input id="editServiceSubject" value="${escapeHtml(service.subject || '')}"></label><label>Description<textarea id="editServiceDescription" rows="3">${escapeHtml(service.description || '')}</textarea></label><div class="form-row"><label>Capacity<input id="editServiceCapacity" type="number" min="1" value="${service.capacity}" required></label><label>Price<input id="editServicePrice" type="number" min="0" step="0.01" value="${service.price ?? ''}"></label></div><div class="form-row"><label>Price covers sessions<input id="editServicePriceSessions" type="number" min="1" value="${service.price_session_count || 1}"></label><label>Package validity days<input id="editServiceValidity" type="number" min="1" value="${service.package_validity_days || ''}"></label></div><label class="check-label"><input id="editServicePublished" type="checkbox" ${service.is_published ? 'checked' : ''}> Published</label><div class="form-actions"><button type="submit">Save changes</button><button type="button" class="secondary-button" id="closeServiceEdit">Cancel</button></div></form>`
+    const endMode = service.schedule_open_ended ? 'open' : 'date'
+    panel.innerHTML = `<p class="eyebrow">Edit offering</p><h2>${escapeHtml(service.name)}</h2><form id="editServiceForm" class="stacked-form"><label>Name<input id="editServiceName" value="${escapeHtml(service.name)}" required></label><label>Subject<input id="editServiceSubject" list="editServiceSubjectOptions" value="${escapeHtml(service.subject || '')}" ${isCohort ? 'required' : ''}><datalist id="editServiceSubjectOptions">${subjects.map(subject => `<option value="${escapeHtml(subject)}">`).join('')}</datalist></label><label>Description<textarea id="editServiceDescription" rows="3">${escapeHtml(service.description || '')}</textarea></label><div class="form-row"><label>Capacity<input id="editServiceCapacity" type="number" min="1" value="${service.capacity}" required></label><label>Price<input id="editServicePrice" type="number" min="0" step="0.01" value="${service.price ?? ''}"></label></div><div class="form-row"><label>Price covers sessions<input id="editServicePriceSessions" type="number" min="1" value="${service.price_session_count || 1}"></label><label>Package validity days<input id="editServiceValidity" type="number" min="1" value="${service.package_validity_days || ''}"></label></div>${isCohort ? `<fieldset class="cohort-setup"><legend>Class timetable and enrolment</legend><div class="form-row"><label>Class starts<input id="editCohortStartDate" type="date" value="${service.cohort_start_date || ''}" required></label><label>Schedule length<select id="editCohortEndMode"><option value="date" ${endMode === 'date' ? 'selected' : ''}>End date</option><option value="weeks">Number of weeks</option><option value="open" ${endMode === 'open' ? 'selected' : ''}>Open-ended</option></select></label></div><div class="form-row" id="editCohortEndDateRow" ${endMode === 'date' ? '' : 'hidden'}><label>Class ends<input id="editCohortEndDate" type="date" value="${service.cohort_end_date || ''}"></label></div><div class="form-row" id="editCohortWeeksRow" hidden><label>Number of weeks<input id="editCohortWeeks" type="number" min="1" max="260" value="12"></label></div><label>Apply timetable changes from<input id="editScheduleApplyFrom" type="date" value="${new Date().toISOString().slice(0, 10)}" required><small>Past classes remain unchanged. Future booked sessions must be rescheduled first.</small></label><div class="class-day-grid">${dayNames.map((day, index) => { const pattern = patterns.find(item => item.day_of_week === index); return `<div class="class-day-row"><label class="check-label"><input class="edit-class-day-enabled" type="checkbox" data-day="${index}" ${pattern ? 'checked' : ''}> ${day}</label><input class="edit-class-day-start" data-day="${index}" type="time" value="${(pattern?.starts_at || '09:00').slice(0, 5)}" aria-label="${day} starts"><input class="edit-class-day-end" data-day="${index}" type="time" value="${(pattern?.ends_at || '10:00').slice(0, 5)}" aria-label="${day} ends"><select class="edit-class-day-staff" data-day="${index}" aria-label="${day} teacher" data-selected="${pattern?.staff_id || ''}"><option value="">Select qualified teacher</option></select></div>` }).join('')}</div></fieldset>` : ''}<label class="check-label"><input id="editServicePublished" type="checkbox" ${service.is_published ? 'checked' : ''}> Published</label><div class="form-actions"><button id="editServiceSaveButton" type="submit">Save changes</button><button type="button" class="secondary-button" id="closeServiceEdit">Cancel</button></div></form>`
+    function refreshEditTeachers() {
+      const subject = document.getElementById('editServiceSubject').value.trim().toLowerCase()
+      const eligibleIds = new Set(staffSubjects.filter(item => item.subject.trim().toLowerCase() === subject).map(item => item.staff_id))
+      document.querySelectorAll('.edit-class-day-staff').forEach(select => {
+        const selected = select.value || select.dataset.selected
+        select.innerHTML = `<option value="">${subject ? 'Select qualified teacher' : 'Choose a subject first'}</option>${staff.filter(person => eligibleIds.has(person.id)).map(person => `<option value="${person.id}">${escapeHtml(person.display_name)} (${escapeHtml(person.timezone)})</option>`).join('')}`
+        if ([...select.options].some(option => option.value === String(selected))) select.value = String(selected)
+        select.dataset.selected = ''
+      })
+    }
+    refreshEditTeachers()
+    document.getElementById('editServiceSubject').addEventListener('input', refreshEditTeachers)
+    document.getElementById('editCohortEndMode')?.addEventListener('change', event => {
+      document.getElementById('editCohortEndDateRow').hidden = event.target.value !== 'date'
+      document.getElementById('editCohortWeeksRow').hidden = event.target.value !== 'weeks'
+    })
     document.getElementById('closeServiceEdit').onclick = () => { panel.hidden = true }
     document.getElementById('editServiceForm').onsubmit = async event => {
       event.preventDefault()
       const newName = document.getElementById('editServiceName').value.trim()
       const newCapacity = Number(document.getElementById('editServiceCapacity').value)
       if (newCapacity < (enrolledByService[service.id] || 0)) return showMessage(`Capacity cannot be lower than the ${enrolledByService[service.id]} current enrolments.`, 'error')
-      const { error } = await supabase.from('services').update({ name: newName, slug: toSlug(newName), subject: document.getElementById('editServiceSubject').value.trim() || null, description: document.getElementById('editServiceDescription').value.trim() || null, capacity: newCapacity, price: document.getElementById('editServicePrice').value || null, price_session_count: Number(document.getElementById('editServicePriceSessions').value), package_validity_days: document.getElementById('editServiceValidity').value || null, is_published: document.getElementById('editServicePublished').checked }).eq('id', service.id)
+      let error
+      if (isCohort) {
+        const schedule = [...document.querySelectorAll('.edit-class-day-enabled:checked')].map(input => {
+          const day = input.dataset.day
+          return { day_of_week: Number(day), starts_at: document.querySelector(`.edit-class-day-start[data-day="${day}"]`).value, ends_at: document.querySelector(`.edit-class-day-end[data-day="${day}"]`).value, staff_id: Number(document.querySelector(`.edit-class-day-staff[data-day="${day}"]`).value) }
+        })
+        if (!schedule.length || schedule.some(item => !item.staff_id || !item.starts_at || !item.ends_at || item.ends_at <= item.starts_at)) return showMessage('Select at least one day with a qualified teacher and a valid start/end time.', 'error')
+        const mode = document.getElementById('editCohortEndMode').value
+        const result = await supabase.rpc('update_class_service_setup_v2', { p_service_id: service.id, p_name: newName, p_slug: toSlug(newName), p_subject: document.getElementById('editServiceSubject').value.trim(), p_description: document.getElementById('editServiceDescription').value.trim() || null, p_capacity: newCapacity, p_price: document.getElementById('editServicePrice').value || null, p_price_session_count: Number(document.getElementById('editServicePriceSessions').value), p_package_validity_days: document.getElementById('editServiceValidity').value || null, p_start_date: document.getElementById('editCohortStartDate').value, p_end_date: mode === 'date' ? document.getElementById('editCohortEndDate').value || null : null, p_number_of_weeks: mode === 'weeks' ? Number(document.getElementById('editCohortWeeks').value) : null, p_open_ended: mode === 'open', p_apply_from: document.getElementById('editScheduleApplyFrom').value, p_is_published: document.getElementById('editServicePublished').checked, p_schedule: schedule })
+        error = result.error
+      } else {
+        const result = await supabase.from('services').update({ name: newName, slug: toSlug(newName), subject: document.getElementById('editServiceSubject').value.trim() || null, description: document.getElementById('editServiceDescription').value.trim() || null, capacity: newCapacity, price: document.getElementById('editServicePrice').value || null, price_session_count: Number(document.getElementById('editServicePriceSessions').value), package_validity_days: document.getElementById('editServiceValidity').value || null, is_published: document.getElementById('editServicePublished').checked }).eq('id', service.id)
+        error = result.error
+      }
       if (error) return showMessage(error.code === '23505' ? `A service named "${newName}" already exists. Edit the existing service or choose another name.` : error.message, 'error')
-      showMessage(`${newName} was updated.`); await renderServices(business, access)
+      showMessage(`${newName} and its future timetable were updated.`); await renderServices(business, access)
     }
   }))
 

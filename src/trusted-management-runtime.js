@@ -157,6 +157,7 @@ if (isCustomerManagement) {
   }
 
   const rpcCapability = Object.freeze({
+    update_class_service_setup_v2: 'manageServices',
     create_scheduled_sessions: 'manageAvailability',
     update_scheduled_session: 'manageAvailability',
     cancel_scheduled_session: 'manageAvailability',
