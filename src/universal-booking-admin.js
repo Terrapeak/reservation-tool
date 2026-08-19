@@ -656,6 +656,7 @@ async function renderAvailability(business, access) {
       ? staff.filter(person => person.user_id === access.userId)
       : []
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const serviceMap = Object.fromEntries(services.map(service => [service.id, service]))
 
   document.getElementById('universalBookingContent').innerHTML = `
     <div class="universal-grid">
@@ -663,6 +664,7 @@ async function renderAvailability(business, access) {
         ${manageableStaff.length ? `
           <form id="availabilityForm" class="stacked-form">
             <label>Staff<select id="availabilityStaff">${manageableStaff.map(person => `<option value="${person.id}">${escapeHtml(person.display_name)}</option>`).join('')}</select></label>
+            <div class="entity-card"><p id="availabilityAssignedServices"></p></div>
             <label>Service restriction<select id="availabilityService"><option value="">All assigned services</option>${services.map(service => `<option value="${service.id}">${escapeHtml(service.name)}</option>`).join('')}</select></label>
             <div class="weekly-grid">${days.map((day, index) => `<div class="day-row availability-day"><label class="check-label"><input class="day-enabled" data-day="${index}" type="checkbox">${day}</label><div class="day-periods" data-day="${index}"><div class="period-row"><input class="period-start" type="time" value="09:00"><span>to</span><input class="period-end" type="time" value="17:00"><button type="button" class="remove-period">Remove</button></div><button type="button" class="add-period" data-day="${index}">+ Add time period</button></div></div>`).join('')}</div>
             <div class="form-actions"><button id="availabilitySaveButton" type="submit">Replace weekly schedule</button><span id="availabilitySaveStatus" role="status" aria-live="polite"></span></div>
@@ -672,6 +674,7 @@ async function renderAvailability(business, access) {
         ${manageableStaff.length ? `
           <form id="exceptionForm" class="stacked-form">
             <label>Staff<select id="exceptionStaff">${manageableStaff.map(person => `<option value="${person.id}">${escapeHtml(person.display_name)}</option>`).join('')}</select></label>
+            <div class="entity-card"><p id="exceptionAssignedServices"></p></div>
             <label>Service restriction<select id="exceptionService"><option value="">All assigned services</option>${services.map(service => `<option value="${service.id}">${escapeHtml(service.name)}</option>`).join('')}</select></label>
             <label>Type<select id="exceptionType"><option value="unavailable">Unavailable / day off</option><option value="available">Additional availability</option></select></label>
             <label>Starts<input id="exceptionStart" type="datetime-local" required></label>
@@ -684,6 +687,16 @@ async function renderAvailability(business, access) {
   `
 
   if (!manageableStaff.length) return
+
+  function refreshAssignedServices(staffSelectId, summaryId) {
+    const staffId = Number(document.getElementById(staffSelectId).value)
+    const assignedNames = assignments
+      .filter(item => item.staff_id === staffId && serviceMap[item.service_id])
+      .map(item => serviceMap[item.service_id].name)
+    document.getElementById(summaryId).innerHTML = assignedNames.length
+      ? `<strong>Assigned services:</strong> ${assignedNames.map(escapeHtml).join(', ')}`
+      : '<strong>Assigned services:</strong> No services assigned. Assign services in Team &amp; Resources.'
+  }
 
   function refreshServiceOptions(staffSelectId, serviceSelectId) {
     const staffId = Number(document.getElementById(staffSelectId).value)
@@ -738,6 +751,7 @@ async function renderAvailability(business, access) {
   }
 
   document.getElementById('availabilityStaff').addEventListener('change', () => {
+    refreshAssignedServices('availabilityStaff', 'availabilityAssignedServices')
     refreshServiceOptions('availabilityStaff', 'availabilityService')
     loadWeeklySchedule()
   })
@@ -837,9 +851,12 @@ async function renderAvailability(business, access) {
     showMessage('Calendar exception added.')
   })
   document.getElementById('exceptionStaff').addEventListener('change', () => {
+    refreshAssignedServices('exceptionStaff', 'exceptionAssignedServices')
     refreshServiceOptions('exceptionStaff', 'exceptionService')
     loadExceptions()
   })
+  refreshAssignedServices('availabilityStaff', 'availabilityAssignedServices')
+  refreshAssignedServices('exceptionStaff', 'exceptionAssignedServices')
   refreshServiceOptions('availabilityStaff', 'availabilityService')
   refreshServiceOptions('exceptionStaff', 'exceptionService')
   await loadWeeklySchedule()
