@@ -13,7 +13,7 @@ const capabilityForRoute = () => {
   if (route === 'admin/staff') return 'manageTeam'
   if (route === 'admin/schedule') return 'manageAvailability'
   if (route === 'admin/availability') {
-    return capabilities.manageAvailability ? 'manageAvailability' : 'manageOwnAvailability'
+    return capabilities.manageAvailability ? 'manageAvailability' : 'viewOwnAvailability'
   }
   if (route === 'admin') return 'manageBookings'
   return null
@@ -45,7 +45,6 @@ function suppressUnauthorizedControls(root = document) {
   const canManageServices = capabilities.manageServices === true
   const canManageTeam = capabilities.manageTeam === true
   const canManageAvailability = capabilities.manageAvailability === true
-  const canManageOwnAvailability = capabilities.manageOwnAvailability === true
 
   const disable = (selector, allowed) => {
     if (allowed) return
@@ -65,7 +64,7 @@ function suppressUnauthorizedControls(root = document) {
   disable('#serviceForm', canManageServices)
   disable('#staffForm, #assignmentForm', canManageTeam)
   disable('#sessionForm, #editSessionForm, .cancel-session, .cancel-registration', canManageAvailability)
-  disable('#availabilityForm, #exceptionForm, .remove-exception', canManageAvailability || canManageOwnAvailability)
+  disable('#exceptionForm, .remove-exception', canManageAvailability)
 }
 
 function applyCapabilityUi() {

@@ -95,7 +95,7 @@ if (isCustomerManagement) {
   function protectMutations(table, builder) {
     const capability = tableMutationCapability[table]
     const availabilityAllowed = availabilityTables.has(table) &&
-      (hasCapability('manageAvailability') || hasCapability('manageOwnAvailability'))
+      hasCapability('manageAvailability')
 
     return new Proxy(builder, {
       get(target, property, receiver) {

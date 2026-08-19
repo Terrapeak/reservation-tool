@@ -109,7 +109,7 @@ function getAccess() {
     canManageServices: runtime.hasCapability('manageServices'),
     canManageTeam: runtime.hasCapability('manageTeam'),
     canManageAvailability: runtime.hasCapability('manageAvailability'),
-    canManageOwnAvailability: runtime.hasCapability('manageOwnAvailability'),
+    canViewOwnAvailability: runtime.hasCapability('viewOwnAvailability'),
     canManageBookings: runtime.hasCapability('manageBookings'),
     canViewAnalytics: runtime.hasCapability('viewAnalytics')
   })
@@ -651,9 +651,10 @@ async function renderAvailability(business, access) {
   if (servicesError) throw servicesError
   if (assignmentsError) throw assignmentsError
 
-  const manageableStaff = access.canManageAvailability
+  const canEditAvailability = access.canManageAvailability
+  const visibleStaff = canEditAvailability
     ? staff
-    : access.canManageOwnAvailability
+    : access.canViewOwnAvailability
       ? staff.filter(person => person.user_id === access.userId)
       : []
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -662,32 +663,28 @@ async function renderAvailability(business, access) {
   document.getElementById('universalBookingContent').innerHTML = `
     <div class="universal-grid">
       <section class="panel"><p class="eyebrow">Weekly hours</p><h2>Recurring availability</h2>
-        ${manageableStaff.length ? `
+        ${visibleStaff.length ? `
           <form id="availabilityForm" class="stacked-form">
-            <label>Staff<select id="availabilityStaff">${manageableStaff.map(person => `<option value="${person.id}">${escapeHtml(person.display_name)}</option>`).join('')}</select></label>
+            <label>Staff<select id="availabilityStaff" ${canEditAvailability ? '' : 'disabled'}>${visibleStaff.map(person => `<option value="${person.id}">${escapeHtml(person.display_name)}</option>`).join('')}</select></label>
             <div class="entity-card"><p id="availabilityAssignedServices"></p></div>
             <label>Service restriction<select id="availabilityService"><option value="">All assigned services</option>${services.map(service => `<option value="${service.id}">${escapeHtml(service.name)}</option>`).join('')}</select></label>
-            <div class="weekly-grid">${days.map((day, index) => `<div class="day-row availability-day"><label class="check-label"><input class="day-enabled" data-day="${index}" type="checkbox">${day}</label><div class="day-periods" data-day="${index}"><div class="period-row"><input class="period-start" type="time" value="09:00"><span>to</span><input class="period-end" type="time" value="17:00"><button type="button" class="remove-period">Remove</button></div><button type="button" class="add-period" data-day="${index}">+ Add time period</button></div></div>`).join('')}</div>
-            <div class="form-actions"><button id="availabilitySaveButton" type="submit">Replace weekly schedule</button><span id="availabilitySaveStatus" role="status" aria-live="polite"></span></div>
-          </form>` : '<p>This TerraPeak role does not manage availability.</p>'}
+            <div class="weekly-grid">${days.map((day, index) => `<div class="day-row availability-day"><label class="check-label"><input class="day-enabled" data-day="${index}" type="checkbox" ${canEditAvailability ? '' : 'disabled'}>${day}</label><div class="day-periods" data-day="${index}"><div class="period-row"><input class="period-start" type="time" value="09:00" ${canEditAvailability ? '' : 'disabled'}><span>to</span><input class="period-end" type="time" value="17:00" ${canEditAvailability ? '' : 'disabled'}>${canEditAvailability ? '<button type="button" class="remove-period">Remove</button>' : ''}</div>${canEditAvailability ? `<button type="button" class="add-period" data-day="${index}">+ Add time period</button>` : ''}</div></div>`).join('')}</div>
+            ${canEditAvailability ? '<div class="form-actions"><button id="availabilitySaveButton" type="submit">Replace weekly schedule</button><span id="availabilitySaveStatus" role="status" aria-live="polite"></span></div>' : '<p class="empty-copy">View only. Contact your administrator or planner if this schedule needs to change.</p>'}
+          </form>` : access.canViewOwnAvailability ? '<p>Your TerraPeak account is not linked to a Reservations staff profile. Ask an administrator to link your profile.</p>' : '<p>This TerraPeak role does not have staff availability access.</p>'}
       </section>
       <section class="panel"><p class="eyebrow">Exceptions</p><h2>Day off or special hours</h2>
-        ${manageableStaff.length ? `
-          <form id="exceptionForm" class="stacked-form">
-            <label>Staff<select id="exceptionStaff">${manageableStaff.map(person => `<option value="${person.id}">${escapeHtml(person.display_name)}</option>`).join('')}</select></label>
+        ${visibleStaff.length ? `
+          ${canEditAvailability ? '<form id="exceptionForm" class="stacked-form">' : '<div class="stacked-form">'}
+            <label>Staff<select id="exceptionStaff" ${canEditAvailability ? '' : 'disabled'}>${visibleStaff.map(person => `<option value="${person.id}">${escapeHtml(person.display_name)}</option>`).join('')}</select></label>
             <div class="entity-card"><p id="exceptionAssignedServices"></p></div>
             <label>Service restriction<select id="exceptionService"><option value="">All assigned services</option>${services.map(service => `<option value="${service.id}">${escapeHtml(service.name)}</option>`).join('')}</select></label>
-            <label>Type<select id="exceptionType"><option value="unavailable">Unavailable / day off</option><option value="available">Additional availability</option></select></label>
-            <label>Starts<input id="exceptionStart" type="datetime-local" required></label>
-            <label>Ends<input id="exceptionEnd" type="datetime-local" required></label>
-            <label>Reason<input id="exceptionReason"></label>
-            <div class="form-actions"><button id="exceptionSaveButton" type="submit">Add exception</button><span id="exceptionSaveStatus" role="status" aria-live="polite"></span></div>
-          </form><div id="exceptionList" class="calendar-summary"></div>` : ''}
+            ${canEditAvailability ? '<label>Type<select id="exceptionType"><option value="unavailable">Unavailable / day off</option><option value="available">Additional availability</option></select></label><label>Starts<input id="exceptionStart" type="datetime-local" required></label><label>Ends<input id="exceptionEnd" type="datetime-local" required></label><label>Reason<input id="exceptionReason"></label><div class="form-actions"><button id="exceptionSaveButton" type="submit">Add exception</button><span id="exceptionSaveStatus" role="status" aria-live="polite"></span></div>' : '<p class="empty-copy">Upcoming exceptions are view only.</p>'}
+          ${canEditAvailability ? '</form>' : '</div>'}<div id="exceptionList" class="calendar-summary"></div>` : ''}
       </section>
     </div>
   `
 
-  if (!manageableStaff.length) return
+  if (!visibleStaff.length) return
 
   function refreshAssignedServices(staffSelectId, summaryId) {
     const staffId = Number(document.getElementById(staffSelectId).value)
@@ -709,7 +706,7 @@ async function renderAvailability(business, access) {
   }
 
   function wirePeriodRow(row) {
-    row.querySelector('.remove-period').addEventListener('click', () => {
+    row.querySelector('.remove-period')?.addEventListener('click', () => {
       const container = row.closest('.day-periods')
       if (container.querySelectorAll('.period-row').length === 1) {
         document.querySelector(`.day-enabled[data-day="${container.dataset.day}"]`).checked = false
@@ -721,7 +718,7 @@ async function renderAvailability(business, access) {
   function appendPeriod(container, start = '09:00', end = '17:00') {
     const row = document.createElement('div')
     row.className = 'period-row'
-    row.innerHTML = `<input class="period-start" type="time" value="${start.slice(0, 5)}"><span>to</span><input class="period-end" type="time" value="${end.slice(0, 5)}"><button type="button" class="remove-period">Remove</button>`
+    row.innerHTML = `<input class="period-start" type="time" value="${start.slice(0, 5)}" ${canEditAvailability ? '' : 'disabled'}><span>to</span><input class="period-end" type="time" value="${end.slice(0, 5)}" ${canEditAvailability ? '' : 'disabled'}>${canEditAvailability ? '<button type="button" class="remove-period">Remove</button>' : ''}`
     container.insertBefore(row, container.querySelector('.add-period'))
     wirePeriodRow(row)
     return row
@@ -757,7 +754,7 @@ async function renderAvailability(business, access) {
     loadWeeklySchedule()
   })
   document.getElementById('availabilityService').addEventListener('change', loadWeeklySchedule)
-  document.getElementById('availabilityForm').addEventListener('submit', async event => {
+  document.getElementById('availabilityForm')?.addEventListener('submit', async event => {
     event.preventDefault()
     const saveButton = document.getElementById('availabilitySaveButton')
     const saveStatus = document.getElementById('availabilitySaveStatus')
@@ -806,7 +803,7 @@ async function renderAvailability(business, access) {
     const { data: exceptions, error } = await supabase.from('availability_exceptions').select('id, service_id, starts_at, ends_at, exception_type, reason').eq('staff_id', staffId).gte('ends_at', new Date().toISOString()).order('starts_at').limit(30)
     if (error) return showMessage(error.message, 'error')
     const target = document.getElementById('exceptionList')
-    target.innerHTML = '<h3>Upcoming exceptions</h3>' + (exceptions.length ? exceptions.map(item => `<div class="calendar-item"><div><strong>${item.exception_type === 'unavailable' ? 'Time off' : 'Special hours'}</strong><span>${new Date(item.starts_at).toLocaleString()} – ${new Date(item.ends_at).toLocaleString()}</span><small>${escapeHtml(item.reason || '')}</small></div><button type="button" class="danger-text remove-exception" data-id="${item.id}">Remove</button></div>`).join('') : '<p>No upcoming exceptions.</p>')
+    target.innerHTML = '<h3>Upcoming exceptions</h3>' + (exceptions.length ? exceptions.map(item => `<div class="calendar-item"><div><strong>${item.exception_type === 'unavailable' ? 'Time off' : 'Special hours'}</strong><span>${new Date(item.starts_at).toLocaleString()} – ${new Date(item.ends_at).toLocaleString()}</span><small>${escapeHtml(item.reason || '')}</small></div>${canEditAvailability ? `<button type="button" class="danger-text remove-exception" data-id="${item.id}">Remove</button>` : ''}</div>`).join('') : '<p>No upcoming exceptions.</p>')
     target.querySelectorAll('.remove-exception').forEach(button => button.addEventListener('click', async () => {
       const { error: deleteError } = await supabase.from('availability_exceptions').delete().eq('id', Number(button.dataset.id))
       if (deleteError) return showMessage(deleteError.message, 'error')
@@ -815,7 +812,7 @@ async function renderAvailability(business, access) {
     }))
   }
 
-  document.getElementById('exceptionForm').addEventListener('submit', async event => {
+  document.getElementById('exceptionForm')?.addEventListener('submit', async event => {
     event.preventDefault()
     const saveButton = document.getElementById('exceptionSaveButton')
     const saveStatus = document.getElementById('exceptionSaveStatus')

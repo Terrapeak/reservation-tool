@@ -24,7 +24,20 @@ test('booking controls remain capability-aware and analytics fails closed', asyn
   assert.match(capabilities, /manageSettings/)
   assert.match(capabilities, /manageServices/)
   assert.match(capabilities, /manageTeam/)
-  assert.match(capabilities, /manageOwnAvailability/)
+  assert.match(capabilities, /viewOwnAvailability/)
+  assert.doesNotMatch(capabilities, /canManageOwnAvailability/)
+})
+
+test('staff availability is view-only while planners retain management controls', async () => {
+  const source = await read('../src/universal-booking-admin.js')
+  const runtime = await read('../src/trusted-management-runtime.js')
+  const migration = await read('../supabase/migrations/20260819033000_restrict_availability_writes_to_planners.sql')
+
+  assert.match(source, /canViewOwnAvailability/)
+  assert.match(source, /View only\. Contact your administrator or planner/)
+  assert.doesNotMatch(runtime, /manageOwnAvailability/)
+  assert.match(migration, /array\['owner', 'manager'\]/)
+  assert.doesNotMatch(migration, /staff\.user_id\s*=\s*\(select auth\.uid\(\)\)/)
 })
 
 test('restaurant-only settings are rendered only when a restaurant service exists', async () => {
