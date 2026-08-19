@@ -665,7 +665,7 @@ async function renderAvailability(business, access) {
             <label>Staff<select id="availabilityStaff">${manageableStaff.map(person => `<option value="${person.id}">${escapeHtml(person.display_name)}</option>`).join('')}</select></label>
             <label>Service restriction<select id="availabilityService"><option value="">All assigned services</option>${services.map(service => `<option value="${service.id}">${escapeHtml(service.name)}</option>`).join('')}</select></label>
             <div class="weekly-grid">${days.map((day, index) => `<div class="day-row availability-day"><label class="check-label"><input class="day-enabled" data-day="${index}" type="checkbox">${day}</label><div class="day-periods" data-day="${index}"><div class="period-row"><input class="period-start" type="time" value="09:00"><span>to</span><input class="period-end" type="time" value="17:00"><button type="button" class="remove-period">Remove</button></div><button type="button" class="add-period" data-day="${index}">+ Add time period</button></div></div>`).join('')}</div>
-            <button type="submit">Replace weekly schedule</button>
+            <div class="form-actions"><button id="availabilitySaveButton" type="submit">Replace weekly schedule</button><span id="availabilitySaveStatus" role="status" aria-live="polite"></span></div>
           </form>` : '<p>This TerraPeak role does not manage availability.</p>'}
       </section>
       <section class="panel"><p class="eyebrow">Exceptions</p><h2>Day off or special hours</h2>
@@ -677,7 +677,7 @@ async function renderAvailability(business, access) {
             <label>Starts<input id="exceptionStart" type="datetime-local" required></label>
             <label>Ends<input id="exceptionEnd" type="datetime-local" required></label>
             <label>Reason<input id="exceptionReason"></label>
-            <button type="submit">Add exception</button>
+            <div class="form-actions"><button id="exceptionSaveButton" type="submit">Add exception</button><span id="exceptionSaveStatus" role="status" aria-live="polite"></span></div>
           </form><div id="exceptionList" class="calendar-summary"></div>` : ''}
       </section>
     </div>
@@ -744,6 +744,8 @@ async function renderAvailability(business, access) {
   document.getElementById('availabilityService').addEventListener('change', loadWeeklySchedule)
   document.getElementById('availabilityForm').addEventListener('submit', async event => {
     event.preventDefault()
+    const saveButton = document.getElementById('availabilitySaveButton')
+    const saveStatus = document.getElementById('availabilitySaveStatus')
     const staffId = Number(document.getElementById('availabilityStaff').value)
     const serviceValue = document.getElementById('availabilityService').value
     const serviceId = serviceValue ? Number(serviceValue) : null
@@ -760,16 +762,28 @@ async function renderAvailability(business, access) {
     })
     const invalidRule = rules.find(rule => !rule.start_time || !rule.end_time || rule.end_time <= rule.start_time)
     if (invalidRule) return showMessage(`${days[invalidRule.day_of_week]} has an invalid time range.`, 'error')
+    saveButton.disabled = true
+    saveStatus.textContent = 'Saving…'
     let deleteQuery = supabase.from('availability_rules').delete().eq('staff_id', staffId)
     deleteQuery = serviceId === null ? deleteQuery.is('service_id', null) : deleteQuery.eq('service_id', serviceId)
     const { error: deleteError } = await deleteQuery
-    if (deleteError) return showMessage(deleteError.message, 'error')
+    if (deleteError) {
+      saveButton.disabled = false
+      saveStatus.textContent = 'Not saved.'
+      return showMessage(deleteError.message, 'error')
+    }
     if (rules.length) {
       const { error } = await supabase.from('availability_rules').insert(rules)
-      if (error) return showMessage(error.message, 'error')
+      if (error) {
+        saveButton.disabled = false
+        saveStatus.textContent = 'Not saved.'
+        return showMessage(error.message, 'error')
+      }
     }
-    showMessage('Weekly availability saved.')
     await loadWeeklySchedule()
+    saveButton.disabled = false
+    saveStatus.textContent = 'Saved.'
+    showMessage('Weekly availability saved.')
   })
 
   async function loadExceptions() {
@@ -788,19 +802,39 @@ async function renderAvailability(business, access) {
 
   document.getElementById('exceptionForm').addEventListener('submit', async event => {
     event.preventDefault()
+    const saveButton = document.getElementById('exceptionSaveButton')
+    const saveStatus = document.getElementById('exceptionSaveStatus')
+    const staffId = Number(document.getElementById('exceptionStaff').value)
+    const serviceValue = document.getElementById('exceptionService').value
+    const startInput = document.getElementById('exceptionStart')
+    const endInput = document.getElementById('exceptionEnd')
+    const startsAt = new Date(startInput.value)
+    const endsAt = new Date(endInput.value)
+    if (!Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime())) return showMessage('Choose a valid start and end date/time.', 'error')
+    if (endsAt <= startsAt) return showMessage('The exception end must be after its start.', 'error')
+    saveButton.disabled = true
+    saveStatus.textContent = 'Saving…'
     const { error } = await supabase.from('availability_exceptions').insert({
       business_id: business.id,
-      staff_id: Number(document.getElementById('exceptionStaff').value),
-      service_id: document.getElementById('exceptionService').value ? Number(document.getElementById('exceptionService').value) : null,
+      staff_id: staffId,
+      service_id: serviceValue ? Number(serviceValue) : null,
       exception_type: document.getElementById('exceptionType').value,
-      starts_at: new Date(document.getElementById('exceptionStart').value).toISOString(),
-      ends_at: new Date(document.getElementById('exceptionEnd').value).toISOString(),
+      starts_at: startsAt.toISOString(),
+      ends_at: endsAt.toISOString(),
       reason: document.getElementById('exceptionReason').value.trim() || null
     })
-    if (error) return showMessage(error.message, 'error')
-    event.currentTarget.reset()
-    showMessage('Calendar exception added.')
+    if (error) {
+      saveButton.disabled = false
+      saveStatus.textContent = 'Not saved.'
+      return showMessage(error.message, 'error')
+    }
+    startInput.value = ''
+    endInput.value = ''
+    document.getElementById('exceptionReason').value = ''
     await loadExceptions()
+    saveButton.disabled = false
+    saveStatus.textContent = 'Added.'
+    showMessage('Calendar exception added.')
   })
   document.getElementById('exceptionStaff').addEventListener('change', () => {
     refreshServiceOptions('exceptionStaff', 'exceptionService')
