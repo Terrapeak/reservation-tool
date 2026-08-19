@@ -98,3 +98,12 @@ test('class signup is an enquiry with parent self-service', async () => {
   assert.match(admin, /Manage enquiries/)
   assert.match(migration, /contact_requested/)
 })
+
+test('archived services remain discoverable and can be restored', async () => {
+  const source = await read('../src/universal-booking-admin.js')
+  const migration = await read('../supabase/migrations/20260819093000_restore_archived_services.sql')
+  assert.match(source, /Archived services/)
+  assert.match(source, /Restore as draft/)
+  assert.match(source, /restore_archived_service/)
+  assert.match(migration, /is_active=true,is_published=false/)
+})

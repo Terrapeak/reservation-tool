@@ -140,8 +140,9 @@ async function startUniversalBookingAdmin() {
 }
 
 async function renderServices(business, access) {
-  const [{ data: services, error }, { data: staff, error: staffError }, { data: enrollments, error: enrollmentError }, { data: staffSubjects, error: subjectError }, { data: schedulePatterns, error: patternsError }, { data: weeklyRules, error: rulesError }] = await Promise.all([
+  const [{ data: services, error }, { data: archivedServices, error: archivedError }, { data: staff, error: staffError }, { data: enrollments, error: enrollmentError }, { data: staffSubjects, error: subjectError }, { data: schedulePatterns, error: patternsError }, { data: weeklyRules, error: rulesError }] = await Promise.all([
     supabase.from('services').select('*').eq('business_id', business.id).eq('is_active', true).order('name'),
+    supabase.from('services').select('id, name, slug, booking_type, updated_at').eq('business_id', business.id).eq('is_active', false).order('name'),
     supabase.from('staff_members').select('id, display_name, timezone, is_published').eq('business_id', business.id).eq('is_active', true).order('display_name'),
     supabase.from('class_enrollments').select('id, service_id, reference, customer_name, guardian_name, customer_email, customer_phone, quantity, joins_on, status, enquiry_status, contact_requested, school_grade, notes, created_at').eq('business_id', business.id).order('created_at', { ascending: false }),
     supabase.from('staff_subjects').select('staff_id, subject').eq('business_id', business.id),
@@ -149,6 +150,7 @@ async function renderServices(business, access) {
     supabase.from('availability_rules').select('staff_id, service_id, day_of_week, start_time, end_time, is_active').eq('business_id', business.id).eq('is_active', true)
   ])
   if (error) throw error
+  if (archivedError) throw archivedError
   if (staffError) throw staffError
   if (enrollmentError) throw enrollmentError
   if (subjectError) throw subjectError
@@ -188,6 +190,7 @@ async function renderServices(business, access) {
           `).join('') : '<p class="empty-copy">No services have been created yet.</p>'}
         </div>
       </section>
+      ${archivedServices.length ? `<section class="panel"><div class="panel-heading"><div><p class="eyebrow">Archive</p><h2>Archived services</h2></div><span>${archivedServices.length}</span></div><p class="empty-copy">Archived services keep their booking and class history. Restore one to edit and reuse its name.</p><div class="card-list">${archivedServices.map(service => `<article class="entity-card"><div><h3>${escapeHtml(service.name)}</h3><small>${escapeHtml(service.booking_type)} · Hidden from customers</small></div>${access.canManageServices ? `<button type="button" class="secondary-button restore-service" data-id="${service.id}">Restore as draft</button>` : '<span class="status">Archived</span>'}</article>`).join('')}</div></section>` : ''}
       <section id="serviceEditPanel" class="panel" hidden></section>
       <section class="panel">
         <p class="eyebrow">New offering</p><h2>Create a service</h2>
@@ -219,6 +222,14 @@ async function renderServices(business, access) {
       </section>
     </div>
   `
+
+  document.querySelectorAll('.restore-service').forEach(button => button.addEventListener('click', async () => {
+    button.disabled = true
+    const { error } = await supabase.rpc('restore_archived_service', { p_service_id: Number(button.dataset.id) })
+    if (error) { button.disabled = false; return showMessage(error.message, 'error') }
+    showMessage('Service restored as a draft. You can now edit and publish it.')
+    await renderServices(business, access)
+  }))
 
   document.querySelectorAll('.manage-enquiries').forEach(button => button.addEventListener('click', () => {
     const service = services.find(item => item.id === Number(button.dataset.id))
