@@ -337,7 +337,8 @@ async function renderStaff(business, access) {
   if (assignmentsError) throw assignmentsError
   if (subjectError) throw subjectError
 
-  const assignmentsByStaff = assignments.reduce((grouped, assignment) => {
+  const activeServiceIds = new Set(services.map(service => service.id))
+  const assignmentsByStaff = assignments.filter(assignment => activeServiceIds.has(assignment.service_id)).reduce((grouped, assignment) => {
     grouped[assignment.staff_id] ||= []
     grouped[assignment.staff_id].push(assignment)
     return grouped
@@ -365,13 +366,13 @@ async function renderStaff(business, access) {
             </form>` : '<p>This TerraPeak role has read-only team access.</p>'}
         </section>
         <section class="panel"><p class="eyebrow">Capabilities</p><h2>Assign subjects or services</h2>
-          ${access.canManageTeam && staff.length && services.length ? `
+          ${access.canManageTeam && staff.length ? `
             <form id="assignmentForm" class="stacked-form">
               <label>Staff<select id="assignmentStaff">${staff.map(person => `<option value="${person.id}">${escapeHtml(person.display_name)}</option>`).join('')}</select></label>
               <label>Qualified subjects<input id="assignmentSubjects" placeholder="English, Mathematics"><small>Separate multiple subjects with commas. These control which teachers appear while creating a class.</small></label>
-              <fieldset class="service-checkboxes"><legend>Subjects or services this person can provide</legend>${services.map(service => `<label class="check-label"><input class="assignment-service" type="checkbox" value="${service.id}"> ${escapeHtml(service.name)}</label>`).join('')}</fieldset>
-              <button type="submit">Save assignments</button>
-            </form>` : '<p>Service assignments require team-management permission.</p>'}
+              ${services.length ? `<fieldset class="service-checkboxes"><legend>Active services this person can provide</legend>${services.map(service => `<label class="check-label"><input class="assignment-service" type="checkbox" value="${service.id}"> ${escapeHtml(service.name)}</label>`).join('')}</fieldset>` : '<p class="empty-copy">No active services are available to assign. Teaching subjects can still be saved.</p>'}
+              <button type="submit">Save eligibility and assignments</button>
+            </form>` : access.canManageTeam ? '<p>Create a staff member before assigning teaching subjects.</p>' : '<p>Teaching eligibility and service assignments require team-management permission.</p>'}
         </section>
       </div>
     </div>
@@ -420,7 +421,7 @@ async function renderStaff(business, access) {
       }
     })
     const [{ error }, { error: subjectSaveError }] = await Promise.all([
-      supabase.from('staff_services').upsert(payload),
+      payload.length ? supabase.from('staff_services').upsert(payload) : Promise.resolve({ error: null }),
       supabase.rpc('set_staff_subjects', { p_staff_id: staffId, p_subjects: subjects })
     ])
     if (error || subjectSaveError) return showMessage((error || subjectSaveError).message, 'error')
