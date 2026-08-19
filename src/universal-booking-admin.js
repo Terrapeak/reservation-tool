@@ -143,7 +143,7 @@ async function renderServices(business, access) {
   const [{ data: services, error }, { data: staff, error: staffError }, { data: enrollments, error: enrollmentError }, { data: staffSubjects, error: subjectError }, { data: schedulePatterns, error: patternsError }, { data: weeklyRules, error: rulesError }] = await Promise.all([
     supabase.from('services').select('*').eq('business_id', business.id).eq('is_active', true).order('name'),
     supabase.from('staff_members').select('id, display_name, timezone, is_published').eq('business_id', business.id).eq('is_active', true).order('display_name'),
-    supabase.from('class_enrollments').select('service_id, quantity, status').eq('business_id', business.id).in('status', ['pending', 'confirmed']),
+    supabase.from('class_enrollments').select('id, service_id, reference, customer_name, guardian_name, customer_email, customer_phone, quantity, joins_on, status, enquiry_status, contact_requested, school_grade, notes, created_at').eq('business_id', business.id).order('created_at', { ascending: false }),
     supabase.from('staff_subjects').select('staff_id, subject').eq('business_id', business.id),
     supabase.from('service_schedule_patterns').select('id, service_id, staff_id, day_of_week, starts_at, ends_at').eq('business_id', business.id).eq('is_active', true).order('day_of_week'),
     supabase.from('availability_rules').select('staff_id, service_id, day_of_week, start_time, end_time, is_active').eq('business_id', business.id).eq('is_active', true)
@@ -154,7 +154,7 @@ async function renderServices(business, access) {
   if (subjectError) throw subjectError
   if (patternsError) throw patternsError
   if (rulesError) throw rulesError
-  const enrolledByService = enrollments.reduce((totals, item) => ({ ...totals, [item.service_id]: (totals[item.service_id] || 0) + item.quantity }), {})
+  const enrolledByService = enrollments.filter(item => ['pending', 'confirmed'].includes(item.status)).reduce((totals, item) => ({ ...totals, [item.service_id]: (totals[item.service_id] || 0) + item.quantity }), {})
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   const subjects = [...new Set([...staffSubjects.map(item => item.subject), ...services.map(item => item.subject).filter(Boolean)])].sort()
   const staffMap = Object.fromEntries(staff.map(person => [person.id, person]))
@@ -181,7 +181,7 @@ async function renderServices(business, access) {
                 <small>${service.scheduling_mode === 'scheduled' ? 'Scheduled sessions' : 'Generated from staff availability'}</small>
                 ${service.enrollment_mode === 'cohort' ? `<small>${enrolledByService[service.id] || 0} of ${service.capacity} enrolled · ${Math.max(service.capacity - (enrolledByService[service.id] || 0), 0)} places left</small>` : ''}
                 ${publicationIssues(service).length ? `<small class="error">Not ready for customers: ${escapeHtml(publicationIssues(service).join(' · '))}</small>` : service.enrollment_mode === 'cohort' ? '<small>Ready for customers</small>' : ''}
-                ${access.canManageServices ? `<div class="entity-links"><button type="button" class="link-button edit-service" data-id="${service.id}">Edit</button>${service.scheduling_mode === 'scheduled' ? `<a href="/${businessSlug}/dashboard/schedule?customerView=1">Manage timetable</a>` : `<a href="/${businessSlug}/dashboard/availability?customerView=1">Set availability</a>`}<button type="button" class="link-button danger-text remove-service" data-id="${service.id}">Remove</button></div>` : ''}
+                ${access.canManageServices ? `<div class="entity-links"><button type="button" class="link-button edit-service" data-id="${service.id}">Edit</button>${service.enrollment_mode === 'cohort' ? `<button type="button" class="link-button manage-enquiries" data-id="${service.id}">Manage enquiries</button>` : ''}${service.scheduling_mode === 'scheduled' ? `<a href="/${businessSlug}/dashboard/schedule?customerView=1">Manage timetable</a>` : `<a href="/${businessSlug}/dashboard/availability?customerView=1">Set availability</a>`}<button type="button" class="link-button danger-text remove-service" data-id="${service.id}">Remove</button></div>` : ''}
               </div>
               <span class="status ${service.is_published ? 'published' : ''}">${service.is_published ? 'Published' : 'Draft'}</span>
             </article>
@@ -219,6 +219,20 @@ async function renderServices(business, access) {
       </section>
     </div>
   `
+
+  document.querySelectorAll('.manage-enquiries').forEach(button => button.addEventListener('click', () => {
+    const service = services.find(item => item.id === Number(button.dataset.id))
+    const items = enrollments.filter(item => item.service_id === service.id)
+    const panel = document.getElementById('serviceEditPanel')
+    panel.hidden = false
+    panel.innerHTML = `<div class="panel-heading"><div><p class="eyebrow">Enrolment enquiries</p><h2>${escapeHtml(service.name)}</h2></div><button type="button" class="secondary-button close-enquiries">Close</button></div><div class="card-list">${items.length ? items.map(item => `<article class="entity-card"><div><h3>${escapeHtml(item.customer_name)}</h3><p>Guardian: ${escapeHtml(item.guardian_name || 'Not provided')} · ${escapeHtml(item.customer_phone)}${item.customer_email ? ` · ${escapeHtml(item.customer_email)}` : ''}</p><small>${escapeHtml(item.reference)} · Preferred start ${item.joins_on}${item.school_grade ? ` · ${escapeHtml(item.school_grade)}` : ''}${item.contact_requested ? ' · Contact requested' : ''}</small>${item.notes ? `<small>${escapeHtml(item.notes)}</small>` : ''}</div><label>Status<select class="enquiry-status" data-id="${item.id}">${['new','contacted','accepted','declined','withdrawn'].map(status => `<option value="${status}" ${status === item.enquiry_status ? 'selected' : ''} ${status === 'withdrawn' ? 'disabled' : ''}>${status}</option>`).join('')}</select></label></article>`).join('') : '<p>No enquiries have been received.</p>'}</div>`
+    panel.querySelector('.close-enquiries').onclick = () => { panel.hidden = true; panel.innerHTML = '' }
+    panel.querySelectorAll('.enquiry-status').forEach(select => select.addEventListener('change', async () => {
+      const { error } = await supabase.rpc('set_class_enquiry_status', { p_enquiry_id: select.dataset.id, p_enquiry_status: select.value })
+      if (error) return showMessage(error.message, 'error')
+      showMessage('Enquiry status updated.'); await renderServices(business, access)
+    }))
+  }))
 
   const serviceType = document.getElementById('serviceType')
   const schedulingMode = document.getElementById('serviceSchedulingMode')
@@ -397,7 +411,7 @@ async function renderStaff(business, access) {
         <div class="panel-heading"><div><p class="eyebrow">People</p><h2>Team & Resources</h2></div><span>${staff.length}</span></div>
         <div class="card-list">
           ${staff.length ? staff.map(person => `
-            <article class="entity-card staff-card"><div><h3>${escapeHtml(person.display_name)}</h3><p>${(assignmentsByStaff[person.id] || []).map(item => escapeHtml(item.services?.name)).join(', ') || 'No services assigned'}</p><small>Qualified subjects: ${staffSubjects.filter(item => item.staff_id === person.id).map(item => escapeHtml(item.subject)).join(', ') || 'None'}</small></div><span class="status ${person.is_published ? 'published' : ''}">${person.is_published ? 'Published' : 'Draft'}</span></article>
+            <article class="entity-card staff-card"><div><h3>${escapeHtml(person.display_name)}</h3><p>${(assignmentsByStaff[person.id] || []).map(item => escapeHtml(item.services?.name)).join(', ') || 'No services assigned'}</p><small>Qualified subjects: ${staffSubjects.filter(item => item.staff_id === person.id).map(item => escapeHtml(item.subject)).join(', ') || 'None'}</small>${access.canManageTeam ? `<form class="staff-login-form" data-id="${person.id}"><label>TerraPeak login email<input type="email" value="${escapeHtml(person.login_email || '')}" placeholder="teacher@example.com"></label><button type="submit" class="secondary-button">Save account link</button></form>` : `<small>${person.user_id ? 'TerraPeak account linked' : 'No TerraPeak account linked'}</small>`}</div><div><span class="status ${person.is_published ? 'published' : ''}">${person.is_published ? 'Published' : 'Draft'}</span><small>${person.user_id ? 'Account linked' : person.login_email ? 'Link pending first sign-in' : 'Not linked'}</small></div></article>
           `).join('') : '<p class="empty-copy">No staff members have been created yet.</p>'}
         </div>
       </section>
@@ -408,6 +422,7 @@ async function renderStaff(business, access) {
               <label>Display name<input id="staffName" required placeholder="Jane Tan"></label>
               <label>Biography<textarea id="staffBio" rows="3"></textarea></label>
               <label>Timezone<input id="staffTimezone" value="Asia/Kuala_Lumpur" required></label>
+              <label>TerraPeak login email<input id="staffLoginEmail" type="email" placeholder="teacher@example.com"><small>The profile links automatically when this team member next opens Reservations.</small></label>
               <label class="check-label"><input id="staffPublished" type="checkbox"> Publish staff profile</label>
               <button type="submit">Create staff member</button>
             </form>` : '<p>This TerraPeak role has read-only team access.</p>'}
@@ -434,12 +449,21 @@ async function renderStaff(business, access) {
       slug: toSlug(displayName),
       bio: document.getElementById('staffBio').value.trim() || null,
       timezone: document.getElementById('staffTimezone').value.trim(),
+      login_email: document.getElementById('staffLoginEmail').value.trim().toLowerCase() || null,
       is_published: document.getElementById('staffPublished').checked
     })
     if (error) return showMessage(error.message, 'error')
     showMessage(`${displayName} was added.`)
     await renderStaff(business, access)
   })
+
+  document.querySelectorAll('.staff-login-form').forEach(form => form.addEventListener('submit', async event => {
+    event.preventDefault()
+    const { error } = await supabase.rpc('set_staff_login_email', { p_staff_id: Number(form.dataset.id), p_login_email: form.querySelector('input').value })
+    if (error) return showMessage(error.message, 'error')
+    showMessage('Staff account link saved. It will activate at the next Reservations sign-in.')
+    await renderStaff(business, access)
+  }))
 
   const assignmentStaff = document.getElementById('assignmentStaff')
   function loadStaffAssignments() {
@@ -689,14 +713,16 @@ async function renderSchedule(business, access) {
 }
 
 async function renderAvailability(business, access) {
-  const [{ data: staff, error: staffError }, { data: services, error: servicesError }, { data: assignments, error: assignmentsError }] = await Promise.all([
+  const [{ data: staff, error: staffError }, { data: services, error: servicesError }, { data: assignments, error: assignmentsError }, { data: holidays, error: holidaysError }] = await Promise.all([
     supabase.from('staff_members').select('id, display_name, user_id, timezone').eq('business_id', business.id).eq('is_active', true).order('display_name'),
     supabase.from('services').select('id, name').eq('business_id', business.id).eq('is_active', true).order('name'),
-    supabase.from('staff_services').select('staff_id, service_id').eq('is_active', true)
+    supabase.from('staff_services').select('staff_id, service_id').eq('is_active', true),
+    supabase.from('centre_holidays').select('id, starts_on, ends_on, reason').eq('business_id', business.id).gte('ends_on', new Date().toISOString().slice(0, 10)).order('starts_on')
   ])
   if (staffError) throw staffError
   if (servicesError) throw servicesError
   if (assignmentsError) throw assignmentsError
+  if (holidaysError) throw holidaysError
 
   const canEditAvailability = access.canManageAvailability
   const visibleStaff = canEditAvailability
@@ -728,8 +754,33 @@ async function renderAvailability(business, access) {
             ${canEditAvailability ? '<label>Type<select id="exceptionType"><option value="unavailable">Unavailable / day off</option><option value="available">Additional availability</option></select></label><label>Starts<input id="exceptionStart" type="datetime-local" required></label><label>Ends<input id="exceptionEnd" type="datetime-local" required></label><label>Reason<input id="exceptionReason"></label><div class="form-actions"><button id="exceptionSaveButton" type="submit">Add exception</button><span id="exceptionSaveStatus" role="status" aria-live="polite"></span></div>' : '<p class="empty-copy">Upcoming exceptions are view only.</p>'}
           ${canEditAvailability ? '</form>' : '</div>'}<div id="exceptionList" class="calendar-summary"></div>` : ''}
       </section>
+      <section class="panel"><p class="eyebrow">Centre calendar</p><h2>Holidays and closures</h2>
+        ${canEditAvailability ? '<form id="holidayForm" class="stacked-form"><div class="form-row"><label>First closed day<input id="holidayStart" type="date" required></label><label>Last closed day<input id="holidayEnd" type="date" required></label></div><label>Holiday or reason<input id="holidayReason" maxlength="300" required></label><p class="empty-copy">Unbooked classes in this period will be cancelled. If a class already has registrations, the closure will pause so staff can contact those families first.</p><div class="form-actions"><button id="holidaySaveButton" type="submit">Add centre closure</button><span id="holidaySaveStatus" role="status" aria-live="polite"></span></div></form>' : ''}
+        <div class="calendar-summary">${holidays.length ? holidays.map(item => `<article class="calendar-item"><div><strong>${escapeHtml(item.reason)}</strong><span>${item.starts_on}${item.ends_on === item.starts_on ? '' : ` – ${item.ends_on}`}</span></div>${canEditAvailability ? `<button type="button" class="danger-text remove-holiday" data-id="${item.id}">Remove</button>` : ''}</article>`).join('') : '<p>No upcoming centre closures.</p>'}</div>
+      </section>
     </div>
   `
+
+  document.getElementById('holidayForm')?.addEventListener('submit', async event => {
+    event.preventDefault()
+    const startsOn = document.getElementById('holidayStart').value
+    const endsOn = document.getElementById('holidayEnd').value
+    if (endsOn < startsOn) return showMessage('The last closed day cannot be before the first.', 'error')
+    const button = document.getElementById('holidaySaveButton')
+    button.disabled = true
+    const { data, error } = await supabase.rpc('create_centre_holiday', { p_business_id: business.id, p_starts_on: startsOn, p_ends_on: endsOn, p_reason: document.getElementById('holidayReason').value.trim() })
+    button.disabled = false
+    if (error) return showMessage(error.message, 'error')
+    showMessage(`Centre closure saved. ${data?.[0]?.sessions_cancelled || 0} class${data?.[0]?.sessions_cancelled === 1 ? '' : 'es'} cancelled.`)
+    await renderAvailability(business, access)
+  })
+  document.querySelectorAll('.remove-holiday').forEach(button => button.addEventListener('click', async () => {
+    if (!window.confirm('Remove this centre closure? Cancelled classes will remain cancelled.')) return
+    const { error } = await supabase.rpc('remove_centre_holiday', { p_holiday_id: Number(button.dataset.id) })
+    if (error) return showMessage(error.message, 'error')
+    showMessage('Centre closure removed. Previously cancelled classes were not restored.')
+    await renderAvailability(business, access)
+  }))
 
   if (!visibleStaff.length) return
 

@@ -67,3 +67,32 @@ test('published class timetables require visible and available teachers', async 
   assert.match(migration, /Publish every selected teacher profile/)
   assert.match(migration, /outside the teacher''s weekly availability/)
 })
+
+test('centre holidays block teacher calendars and protect registered classes', async () => {
+  const source = await read('../src/universal-booking-admin.js')
+  const migration = await read('../supabase/migrations/20260819070000_centre_holidays.sql')
+  assert.match(source, /Holidays and closures/)
+  assert.match(source, /create_centre_holiday/)
+  assert.match(migration, /Centre holiday:/)
+  assert.match(migration, /active registrations/)
+  assert.match(migration, /status='cancelled',is_published=false/)
+})
+
+test('staff profiles can be pre-linked to verified TerraPeak logins', async () => {
+  const source = await read('../src/universal-booking-admin.js')
+  const migration = await read('../supabase/migrations/20260819073000_staff_account_linking.sql')
+  assert.match(source, /TerraPeak login email/)
+  assert.match(source, /set_staff_login_email/)
+  assert.match(migration, /business_login_email_idx/)
+})
+
+test('class signup is an enquiry with parent self-service', async () => {
+  const source = await read('../src/public-booking.js')
+  const admin = await read('../src/universal-booking-admin.js')
+  const migration = await read('../supabase/migrations/20260819080000_learning_centre_enquiries.sql')
+  assert.match(source, /Final enrolment happens only after that conversation/)
+  assert.match(source, /create_public_class_enquiry/)
+  assert.match(source, /manage_public_class_enquiry/)
+  assert.match(admin, /Manage enquiries/)
+  assert.match(migration, /contact_requested/)
+})
