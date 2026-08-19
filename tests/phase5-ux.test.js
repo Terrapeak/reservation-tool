@@ -84,6 +84,8 @@ test('staff profiles can be pre-linked to verified TerraPeak logins', async () =
   assert.match(source, /TerraPeak login email/)
   assert.match(source, /set_staff_login_email/)
   assert.match(migration, /business_login_email_idx/)
+  assert.match(source, /toggle-staff-published/)
+  assert.match(source, /Publish profile/)
 })
 
 test('class signup is an enquiry with parent self-service', async () => {

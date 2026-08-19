@@ -411,7 +411,7 @@ async function renderStaff(business, access) {
         <div class="panel-heading"><div><p class="eyebrow">People</p><h2>Team & Resources</h2></div><span>${staff.length}</span></div>
         <div class="card-list">
           ${staff.length ? staff.map(person => `
-            <article class="entity-card staff-card"><div><h3>${escapeHtml(person.display_name)}</h3><p>${(assignmentsByStaff[person.id] || []).map(item => escapeHtml(item.services?.name)).join(', ') || 'No services assigned'}</p><small>Qualified subjects: ${staffSubjects.filter(item => item.staff_id === person.id).map(item => escapeHtml(item.subject)).join(', ') || 'None'}</small>${access.canManageTeam ? `<form class="staff-login-form" data-id="${person.id}"><label>TerraPeak login email<input type="email" value="${escapeHtml(person.login_email || '')}" placeholder="teacher@example.com"></label><button type="submit" class="secondary-button">Save account link</button></form>` : `<small>${person.user_id ? 'TerraPeak account linked' : 'No TerraPeak account linked'}</small>`}</div><div><span class="status ${person.is_published ? 'published' : ''}">${person.is_published ? 'Published' : 'Draft'}</span><small>${person.user_id ? 'Account linked' : person.login_email ? 'Link pending first sign-in' : 'Not linked'}</small></div></article>
+            <article class="entity-card staff-card"><div><h3>${escapeHtml(person.display_name)}</h3><p>${(assignmentsByStaff[person.id] || []).map(item => escapeHtml(item.services?.name)).join(', ') || 'No services assigned'}</p><small>Qualified subjects: ${staffSubjects.filter(item => item.staff_id === person.id).map(item => escapeHtml(item.subject)).join(', ') || 'None'}</small>${access.canManageTeam ? `<form class="staff-login-form" data-id="${person.id}"><label>TerraPeak login email<input type="email" value="${escapeHtml(person.login_email || '')}" placeholder="teacher@example.com"></label><button type="submit" class="secondary-button">Save account link</button></form>` : `<small>${person.user_id ? 'TerraPeak account linked' : 'No TerraPeak account linked'}</small>`}</div><div><span class="status ${person.is_published ? 'published' : ''}">${person.is_published ? 'Published' : 'Draft'}</span><small>${person.user_id ? 'Account linked' : person.login_email ? 'Link pending first sign-in' : 'Not linked'}</small>${access.canManageTeam ? `<button type="button" class="secondary-button toggle-staff-published" data-id="${person.id}" data-published="${person.is_published}">${person.is_published ? 'Unpublish profile' : 'Publish profile'}</button>` : ''}</div></article>
           `).join('') : '<p class="empty-copy">No staff members have been created yet.</p>'}
         </div>
       </section>
@@ -462,6 +462,15 @@ async function renderStaff(business, access) {
     const { error } = await supabase.rpc('set_staff_login_email', { p_staff_id: Number(form.dataset.id), p_login_email: form.querySelector('input').value })
     if (error) return showMessage(error.message, 'error')
     showMessage('Staff account link saved. It will activate at the next Reservations sign-in.')
+    await renderStaff(business, access)
+  }))
+
+  document.querySelectorAll('.toggle-staff-published').forEach(button => button.addEventListener('click', async () => {
+    const publish = button.dataset.published !== 'true'
+    button.disabled = true
+    const { error } = await supabase.from('staff_members').update({ is_published: publish }).eq('id', Number(button.dataset.id)).eq('business_id', business.id)
+    if (error) { button.disabled = false; return showMessage(error.message, 'error') }
+    showMessage(`Staff profile ${publish ? 'published' : 'unpublished'}.`)
     await renderStaff(business, access)
   }))
 
