@@ -41,7 +41,9 @@
         'admin/availability'
       ])
 
-      if (currentPath === '/onboarding' || currentPath === '/onboarding/') {
+      if (currentPath === '/template-preview/physio' || currentPath === '/template-preview/physio/') {
+        await import('/src/physio-template-preview-page.js')
+      } else if (currentPath === '/onboarding' || currentPath === '/onboarding/') {
         document.querySelector('#app').innerHTML = `
           <main class="auth-card">
             <h1>Reservations setup is managed by TerraPeak</h1>
