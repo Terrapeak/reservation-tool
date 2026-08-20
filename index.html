@@ -58,6 +58,7 @@
         if (managementRoutes.has(currentRoute) && window.__TERRAPEAK_RESERVATIONS_READY__ === true) {
           await import('/src/trusted-management-runtime.js')
           await import('/src/management-entry.js')
+          if (currentRoute === 'admin/services') await import('/src/service-test-cleanup.js')
         }
       }
     </script>
