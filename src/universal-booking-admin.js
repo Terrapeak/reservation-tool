@@ -190,7 +190,7 @@ async function renderServices(business, access) {
           `).join('') : '<p class="empty-copy">No services have been created yet.</p>'}
         </div>
       </section>
-      ${archivedServices.length ? `<section class="panel"><div class="panel-heading"><div><p class="eyebrow">Archive</p><h2>Archived services</h2></div><span>${archivedServices.length}</span></div><p class="empty-copy">Archived services keep their booking and class history. Restore one to edit and reuse its name.</p><div class="card-list">${archivedServices.map(service => `<article class="entity-card"><div><h3>${escapeHtml(service.name)}</h3><small>${escapeHtml(service.booking_type)} · Hidden from customers</small></div>${access.canManageServices ? `<button type="button" class="secondary-button restore-service" data-id="${service.id}">Restore as draft</button>` : '<span class="status">Archived</span>'}</article>`).join('')}</div></section>` : ''}
+      ${archivedServices.length ? `<section class="panel"><div class="panel-heading"><div><p class="eyebrow">Archive</p><h2>Archived services</h2></div><span>${archivedServices.length}</span></div><p class="empty-copy">Restore a service to edit it. Services that were never used can also be permanently deleted.</p><div class="card-list">${archivedServices.map(service => `<article class="entity-card"><div><h3>${escapeHtml(service.name)}</h3><small>${escapeHtml(service.booking_type)} · Hidden from customers</small></div>${access.canManageServices ? `<div class="entity-links"><button type="button" class="secondary-button restore-service" data-id="${service.id}">Restore as draft</button><button type="button" class="danger-text permanently-delete-service" data-id="${service.id}" data-name="${escapeHtml(service.name)}">Delete permanently</button></div>` : '<span class="status">Archived</span>'}</article>`).join('')}</div></section>` : ''}
       <section id="serviceEditPanel" class="panel" hidden></section>
       <section class="panel">
         <p class="eyebrow">New offering</p><h2>Create a service</h2>
@@ -228,6 +228,15 @@ async function renderServices(business, access) {
     const { error } = await supabase.rpc('restore_archived_service', { p_service_id: Number(button.dataset.id) })
     if (error) { button.disabled = false; return showMessage(error.message, 'error') }
     showMessage('Service restored as a draft. You can now edit and publish it.')
+    await renderServices(business, access)
+  }))
+  document.querySelectorAll('.permanently-delete-service').forEach(button => button.addEventListener('click', async () => {
+    const serviceName = button.dataset.name
+    if (window.prompt(`Permanently delete ${serviceName}? This cannot be undone. Type DELETE to continue.`) !== 'DELETE') return
+    button.disabled = true
+    const { error } = await supabase.rpc('permanently_delete_archived_service', { p_service_id: Number(button.dataset.id) })
+    if (error) { button.disabled = false; return showMessage(error.message, 'error') }
+    showMessage(`${serviceName} was permanently deleted.`)
     await renderServices(business, access)
   }))
 
