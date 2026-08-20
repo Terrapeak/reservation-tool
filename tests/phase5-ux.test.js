@@ -107,3 +107,13 @@ test('archived services remain discoverable and can be restored', async () => {
   assert.match(source, /restore_archived_service/)
   assert.match(migration, /is_active=true,is_published=false/)
 })
+
+test('unused archived services can be permanently deleted without erasing history', async () => {
+  const source = await read('../src/universal-booking-admin.js')
+  const migration = await read('../supabase/migrations/20260819101500_permanently_delete_unused_archived_services.sql')
+  assert.match(source, /Delete permanently/)
+  assert.match(source, /Type DELETE to continue/)
+  assert.match(source, /permanently_delete_archived_service/)
+  assert.match(migration, /must remain archived/)
+  assert.match(migration, /public\.scheduled_sessions/)
+})
