@@ -37,6 +37,7 @@ if (legacySettingsRoutes.has(route)) {
 
 if (universalRoutes.has(route)) {
   await import('./universal-booking-admin.js')
+  await import('./reservation-template-preview.js')
 }
 
 await import('./management-capability-ui.js')
