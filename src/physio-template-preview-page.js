@@ -1,6 +1,6 @@
 const app = document.querySelector('#app')
 
-document.title = 'TerraPeak Reservations | Physio Template Preview'
+document.title = 'TerraPeak Reservations | Physio Settings Preview'
 document.body.classList.add('customer-reservations-view')
 
 const fields = [
@@ -11,59 +11,98 @@ const fields = [
   { id: 'reason', label: 'Main reason for appointment', type: 'textarea', required: false, locked: false }
 ]
 
+const navItems = ['Bookings', 'Services', 'Team & Resources', 'Scheduled', 'Availability', 'Analytics', 'Settings']
+
 app.innerHTML = `
-  <main class="universal-admin" style="max-width:1180px;margin:0 auto;padding:28px 20px 60px;">
-    <header class="universal-header" style="margin-bottom:18px;">
+  <main class="reservations-management-shell" style="max-width:1280px;margin:0 auto;">
+    <header class="reservations-shell-header">
       <div>
-        <p class="eyebrow">Phase 2 template preview</p>
-        <h1>Physiotherapy reservation setup</h1>
-        <p>This remains a non-saving preview. We are testing the template and field-ordering approach before connecting it to the live Reservations settings.</p>
+        <p class="reservations-shell-eyebrow">TerraPeak Reservations</p>
+        <h1>Settings</h1>
+        <p>Physiotherapy template preview</p>
       </div>
     </header>
 
-    <section class="panel" style="max-width:900px;margin:0 auto 22px;">
-      <div class="panel-heading">
-        <div><p class="eyebrow">Service template</p><h2>Create a physiotherapy service</h2></div>
-      </div>
-      <form class="stacked-form" onsubmit="event.preventDefault()">
-        <label>Treatment or service name<input value="Initial physiotherapy assessment"></label>
-        <label>Service description <small>(optional)</small><textarea rows="3" placeholder="Optional customer-facing explanation, e.g. First visit assessment for pain, mobility or rehabilitation needs."></textarea></label>
-        <div class="form-row">
-          <label>Service format<select><option>Appointment</option></select></label>
-          <label>Appointment duration (minutes)<input type="number" min="5" value="60"></label>
-        </div>
-        <label>Appointment scheduling<select><option>Generate from practitioner availability</option><option>Use scheduled sessions</option></select></label>
-        <div class="form-row"><label>Booking interval (minutes)<input type="number" min="5" value="30"></label><label>Patients per time slot<input type="number" min="1" value="1"></label></div>
-        <div class="form-row"><label>Price<input type="number" min="0" step="0.01" value="120"></label><label>Currency<input value="MYR" maxlength="3"></label></div>
-        <div class="form-row"><label>Sessions included in price<input type="number" min="1" value="1"></label><label>Package validity (days, optional)<input type="number" min="1"></label></div>
-        <label class="check-label"><input type="checkbox"> Test service</label>
-        <label class="check-label"><input type="checkbox"> Publish on the customer page</label>
-      </form>
-    </section>
+    <nav class="reservations-shell-nav" aria-label="Reservations">
+      ${navItems.map(item => `<a href="#" ${item === 'Settings' ? 'class="active" aria-current="page"' : ''} onclick="event.preventDefault()">${item}</a>`).join('')}
+    </nav>
 
-    <div style="display:grid;grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr);gap:22px;align-items:start;max-width:1100px;margin:0 auto;">
-      <section class="panel">
-        <div class="panel-heading"><div><p class="eyebrow">Customer form</p><h2>Arrange booking fields</h2></div></div>
-        <p class="empty-copy">Mandatory system fields cannot be deleted or renamed, but they can be moved anywhere in the form. Other fields can be changed or removed.</p>
-        <div id="fieldList" class="card-list"></div>
+    <section class="reservations-shell-content">
+      <div style="display:grid;gap:22px;max-width:1050px;margin:0 auto;">
+        <section class="panel">
+          <div class="panel-heading"><div><p class="eyebrow">Business</p><h2>Business profile</h2></div></div>
+          <p class="empty-copy">Shared across all reservation templates.</p>
+          <form class="stacked-form" onsubmit="event.preventDefault()">
+            <label>Business name<input value="Demo Physiotherapy Clinic"></label>
+            <div class="form-row">
+              <label>Industry template<select><option>Physiotherapy</option><option>Learning Centre</option><option>Dentist</option><option>Restaurant</option></select></label>
+              <label>Timezone<select><option>Asia/Kuala_Lumpur</option></select></label>
+            </div>
+            <div class="form-row">
+              <label>Customer label<input value="Patient"></label>
+              <label>Booking label<input value="Appointment"></label>
+            </div>
+          </form>
+        </section>
 
-        <div style="border-top:1px solid #e2e8f0;margin-top:18px;padding-top:18px;">
-          <h3>Add a field</h3>
-          <div class="form-row">
-            <label>Field label<input id="newFieldLabel" placeholder="Gender"></label>
-            <label>Field type<select id="newFieldType"><option value="text">Text</option><option value="textarea">Long text</option><option value="select">Dropdown</option><option value="date">Date</option><option value="checkbox">Checkbox</option></select></label>
+        <section class="panel">
+          <div class="panel-heading"><div><p class="eyebrow">Branding</p><h2>Customer-facing brand</h2></div></div>
+          <p class="empty-copy">Branding remains available regardless of industry.</p>
+          <form class="stacked-form" onsubmit="event.preventDefault()">
+            <label>Logo<input type="file" disabled><small>Logo upload will use the existing stored branding record when connected.</small></label>
+            <div class="form-row">
+              <label>Primary colour<input type="color" value="#2f5d50"></label>
+              <label>Background colour<input type="color" value="#f7faf9"></label>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading"><div><p class="eyebrow">Customer Form</p><h2>Arrange booking fields</h2></div></div>
+          <p class="empty-copy">Mandatory system fields cannot be removed or renamed, but they can be moved anywhere. Optional fields can be changed, removed, required/optional, and reordered around mandatory fields.</p>
+
+          <div style="display:grid;grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr);gap:22px;align-items:start;">
+            <div>
+              <div id="fieldList" class="card-list"></div>
+              <div style="border-top:1px solid #e2e8f0;margin-top:18px;padding-top:18px;">
+                <h3>Add a field</h3>
+                <div class="form-row">
+                  <label>Field label<input id="newFieldLabel" placeholder="Gender"></label>
+                  <label>Field type<select id="newFieldType"><option value="text">Text</option><option value="textarea">Long text</option><option value="select">Dropdown</option><option value="date">Date</option><option value="checkbox">Checkbox</option></select></label>
+                </div>
+                <label class="check-label"><input id="newFieldRequired" type="checkbox"> Required</label>
+                <button id="addField" type="button">Add field</button>
+              </div>
+            </div>
+
+            <aside style="position:sticky;top:18px;border-left:1px solid #e2e8f0;padding-left:22px;">
+              <p class="eyebrow">Live preview</p>
+              <h3>Appointment request form</h3>
+              <p class="empty-copy">Assume the patient already selected the service, practitioner and time.</p>
+              <form id="customerPreview" class="stacked-form" onsubmit="event.preventDefault()"></form>
+            </aside>
           </div>
-          <label class="check-label"><input id="newFieldRequired" type="checkbox"> Required</label>
-          <button id="addField" type="button">Add field</button>
-        </div>
-      </section>
+        </section>
 
-      <section class="panel" style="position:sticky;top:18px;">
-        <div class="panel-heading"><div><p class="eyebrow">Live preview</p><h2>Customer booking form</h2></div></div>
-        <p class="empty-copy">Assume the customer has already chosen the service, practitioner and appointment time.</p>
-        <form id="customerPreview" class="stacked-form" onsubmit="event.preventDefault()"></form>
-      </section>
-    </div>
+        <section class="panel">
+          <div class="panel-heading"><div><p class="eyebrow">Booking Flow</p><h2>How requests are handled</h2></div></div>
+          <form class="stacked-form" onsubmit="event.preventDefault()">
+            <label>Default appointment behaviour<select><option>Confirm immediately when available</option><option>Send as appointment request for staff review</option></select></label>
+            <label>Confirmation message<textarea rows="3">Your appointment request has been received.</textarea></label>
+          </form>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading"><div><p class="eyebrow">Modules</p><h2>Reservations capabilities</h2></div></div>
+          <p class="empty-copy">These control Reservations features, not clinical/CRM functionality.</p>
+          <div class="card-list">
+            <article class="entity-card"><div><h3>Appointments</h3><small>Practitioner availability and patient booking.</small></div><span class="status published">Enabled</span></article>
+            <article class="entity-card"><div><h3>Scheduled</h3><small>Explicit sessions/events when needed.</small></div><span class="status">Optional</span></article>
+            <article class="entity-card"><div><h3>Packages</h3><small>Multi-session pricing without treatment-plan CRM.</small></div><span class="status">Optional</span></article>
+          </div>
+        </section>
+      </div>
+    </section>
   </main>
 `
 
@@ -107,7 +146,6 @@ function renderInput(field) {
 function render() {
   fieldList.innerHTML = fields.map(renderFieldControl).join('')
   customerPreview.innerHTML = fields.map(renderInput).join('') + '<button type="button">Request appointment</button>'
-
   document.querySelectorAll('.move-up').forEach(button => button.onclick = () => move(Number(button.dataset.index), -1))
   document.querySelectorAll('.move-down').forEach(button => button.onclick = () => move(Number(button.dataset.index), 1))
   document.querySelectorAll('.delete-field').forEach(button => button.onclick = () => removeField(button.dataset.id))
