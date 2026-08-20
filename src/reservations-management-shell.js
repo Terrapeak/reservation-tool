@@ -35,7 +35,7 @@ function routeLabel(route) {
   const canonical = canonicalRoute(route)
   if (canonical.endsWith('/services')) return 'Services'
   if (canonical.endsWith('/staff')) return 'Team & Resources'
-  if (canonical.endsWith('/schedule')) return 'Schedule'
+  if (canonical.endsWith('/schedule')) return 'Scheduled'
   if (canonical.endsWith('/availability')) return 'Availability'
   if (canonical.endsWith('/analytics')) return 'Analytics'
   if (canonical.endsWith('/settings')) return 'Settings'
@@ -54,7 +54,7 @@ function buildNavigation(activeRoute) {
     ['Bookings', base],
     ['Services', `${base}/services`],
     ['Team & Resources', `${base}/staff`],
-    ['Class Schedule', `${base}/schedule`],
+    ['Scheduled', `${base}/schedule`],
     ['Availability', `${base}/availability`],
     ['Analytics', `${base}/analytics`],
     ['Settings', `${base}/settings`]
