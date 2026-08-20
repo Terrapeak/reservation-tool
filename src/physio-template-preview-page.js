@@ -58,6 +58,17 @@ app.innerHTML = `
         </section>
 
         <section class="panel">
+          <div class="panel-heading"><div><p class="eyebrow">Services</p><h2>Therapist matching logic</h2></div></div>
+          <p class="empty-copy">A patient chooses the service they need. Reservations then filters the team to therapists who are qualified for that service and only shows times where one of those therapists is actually available.</p>
+          <div class="card-list">
+            <article class="entity-card"><div><h3>1. Patient selects service</h3><small>Example: Initial physiotherapy assessment, sports rehabilitation, post-operative rehab.</small></div></article>
+            <article class="entity-card"><div><h3>2. Match therapist capability</h3><small>Only therapists assigned to that service are eligible, using the same shared service/team assignment concept already used elsewhere in Reservations.</small></div></article>
+            <article class="entity-card"><div><h3>3. Cross-check availability</h3><small>Available appointment slots are generated from the eligible therapists' weekly availability and exceptions.</small></div></article>
+            <article class="entity-card"><div><h3>4. Apply booking flow</h3><small>The business decides whether an available slot confirms immediately or becomes an appointment request for staff review.</small></div></article>
+          </div>
+        </section>
+
+        <section class="panel">
           <div class="panel-heading"><div><p class="eyebrow">Customer Form</p><h2>Arrange booking fields</h2></div></div>
           <p class="empty-copy">Mandatory system fields cannot be removed or renamed, but they can be moved anywhere. Optional fields can be changed, removed, required/optional, and reordered around mandatory fields.</p>
 
@@ -115,16 +126,16 @@ function esc(value) {
 
 function renderFieldControl(field, index) {
   const badge = field.locked ? '<span class="status published">Mandatory</span>' : '<span class="status">Customizable</span>'
-  const editButtons = field.locked ? '' : `<button type="button" class="link-button edit-field" data-id="${field.id}">Edit</button><button type="button" class="link-button danger-text delete-field" data-id="${field.id}">Delete</button>`
+  const editButtons = field.locked ? '' : `<button type="button" class="link-button edit-field" data-field-id="${field.id}">Edit</button><button type="button" class="link-button danger-text delete-field" data-field-id="${field.id}">Delete</button>`
   return `
-    <article class="entity-card" style="align-items:center;">
-      <div style="min-width:0;flex:1;">
+    <article class="entity-card" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;">
+      <div style="min-width:0;">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><h3 style="margin:0;">${esc(field.label)}</h3>${badge}</div>
         <small>${esc(field.type)}${field.required ? ' · required' : ' · optional'}</small>
       </div>
-      <div class="entity-links" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
-        <button type="button" class="secondary-button move-up" data-index="${index}" ${index === 0 ? 'disabled' : ''} aria-label="Move ${esc(field.label)} up">↑</button>
-        <button type="button" class="secondary-button move-down" data-index="${index}" ${index === fields.length - 1 ? 'disabled' : ''} aria-label="Move ${esc(field.label)} down">↓</button>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+        <button type="button" class="secondary-button field-action" data-action="up" data-field-id="${field.id}" ${index === 0 ? 'disabled' : ''} style="min-width:42px;font-size:18px;line-height:1;" aria-label="Move ${esc(field.label)} up">↑</button>
+        <button type="button" class="secondary-button field-action" data-action="down" data-field-id="${field.id}" ${index === fields.length - 1 ? 'disabled' : ''} style="min-width:42px;font-size:18px;line-height:1;" aria-label="Move ${esc(field.label)} down">↓</button>
         ${editButtons}
       </div>
     </article>
@@ -146,16 +157,15 @@ function renderInput(field) {
 function render() {
   fieldList.innerHTML = fields.map(renderFieldControl).join('')
   customerPreview.innerHTML = fields.map(renderInput).join('') + '<button type="button">Request appointment</button>'
-  document.querySelectorAll('.move-up').forEach(button => button.onclick = () => move(Number(button.dataset.index), -1))
-  document.querySelectorAll('.move-down').forEach(button => button.onclick = () => move(Number(button.dataset.index), 1))
-  document.querySelectorAll('.delete-field').forEach(button => button.onclick = () => removeField(button.dataset.id))
-  document.querySelectorAll('.edit-field').forEach(button => button.onclick = () => editField(button.dataset.id))
 }
 
-function move(index, delta) {
+function moveField(id, delta) {
+  const index = fields.findIndex(field => field.id === id)
+  if (index < 0) return
   const target = index + delta
   if (target < 0 || target >= fields.length) return
-  ;[fields[index], fields[target]] = [fields[target], fields[index]]
+  const [field] = fields.splice(index, 1)
+  fields.splice(target, 0, field)
   render()
 }
 
@@ -175,6 +185,16 @@ function editField(id) {
   field.required = window.confirm(`Should "${field.label}" be required?\n\nOK = required, Cancel = optional`)
   render()
 }
+
+fieldList.addEventListener('click', event => {
+  const button = event.target.closest('button')
+  if (!button) return
+  const id = button.dataset.fieldId
+  if (button.dataset.action === 'up') return moveField(id, -1)
+  if (button.dataset.action === 'down') return moveField(id, 1)
+  if (button.classList.contains('delete-field')) return removeField(id)
+  if (button.classList.contains('edit-field')) return editField(id)
+})
 
 document.getElementById('addField').onclick = () => {
   const labelInput = document.getElementById('newFieldLabel')
