@@ -1,98 +1,46 @@
 import { supabase } from './supabaseclient.js'
 
 const runtime = window.__TERRAPEAK_RESERVATIONS_RUNTIME__
-if (!runtime || runtime.source !== 'terrapeak-dashboard') {
-  throw new Error('Trusted TerraPeak Reservations runtime is required.')
-}
+if (!runtime || runtime.source !== 'terrapeak-dashboard') throw new Error('Trusted TerraPeak Reservations runtime is required.')
+const businessId=Number(runtime.businessId), businessSlug=String(runtime.businessSlug||''), canManage=runtime.hasCapability?.('manageSettings')===true
+const esc=(v='')=>String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;')
+const $=s=>document.querySelector(s)
 
-const businessId = Number(runtime.businessId)
-const businessSlug = String(runtime.businessSlug || '')
-const hasCapability = name => runtime.hasCapability?.(name) === true
-const escapeHtml = (value = '') => String(value)
-  .replaceAll('&', '&amp;')
-  .replaceAll('<', '&lt;')
-  .replaceAll('>', '&gt;')
-  .replaceAll('"', '&quot;')
-  .replaceAll("'", '&#039;')
-
-async function loadContext() {
-  const [businessResult, profileResult, brandingResult, settingsResult, serviceResult] = await Promise.all([
-    supabase.from('businesses').select('*').eq('id', businessId).single(),
-    supabase.from('business_profile').select('*').eq('business_id', businessId).maybeSingle(),
-    supabase.from('restaurant_branding').select('*').eq('business_id', businessId).maybeSingle(),
-    supabase.from('restaurant_settings').select('*').eq('business_id', businessId).maybeSingle(),
-    supabase.from('services').select('*').eq('business_id', businessId).eq('booking_type', 'restaurant').eq('is_active', true).order('id').limit(1).maybeSingle()
+async function load(){
+  const [business,profile,branding,restaurant,restaurantService,general,fields]=await Promise.all([
+    supabase.from('businesses').select('*').eq('id',businessId).single(),
+    supabase.from('business_profile').select('*').eq('business_id',businessId).maybeSingle(),
+    supabase.from('restaurant_branding').select('*').eq('business_id',businessId).maybeSingle(),
+    supabase.from('restaurant_settings').select('*').eq('business_id',businessId).maybeSingle(),
+    supabase.from('services').select('*').eq('business_id',businessId).eq('booking_type','restaurant').eq('is_active',true).order('id').limit(1).maybeSingle(),
+    supabase.from('reservation_business_settings').select('*').eq('business_id',businessId).maybeSingle(),
+    supabase.from('booking_custom_fields').select('*').eq('business_id',businessId).eq('is_active',true).order('display_order')
   ])
-  if (businessResult.error || !businessResult.data) throw businessResult.error || new Error('Reservations business not found.')
-  return {
-    business: businessResult.data,
-    profile: profileResult.data || {},
-    branding: brandingResult.data || {},
-    settings: settingsResult.data || {},
-    service: serviceResult.data || null
-  }
+  if(business.error||!business.data) throw business.error||new Error('Reservations business not found.')
+  return {business:business.data,profile:profile.data||{},branding:branding.data||{},restaurant:restaurant.data||{},restaurantService:restaurantService.data||null,general:general.data||{},fields:fields.data||[]}
 }
 
-function navigation() {
-  const base = `/${businessSlug}/dashboard`
-  return `<nav class="admin-nav" aria-label="Reservations management"><a href="${base}">Bookings</a><a href="${base}/analytics">Analytics</a><a class="active" href="${base}/settings">Settings</a></nav>`
+function nav(){const b=`/${businessSlug}/dashboard`;return `<nav class="admin-nav"><a href="${b}">Bookings</a><a href="${b}/analytics">Analytics</a><a class="active" href="${b}/settings">Settings</a></nav>`}
+function fieldRow(f,i,total){const locked=f.is_locked===true;return `<article class="entity-card settings-field" data-id="${f.id}"><div><strong>${esc(f.field_label)}</strong><small>${f.system_key?'System field':esc(f.field_type)}${f.is_required?' · Required':''}</small></div><div class="entity-links"><button type="button" class="secondary-button move-field" data-dir="-1" ${i===0?'disabled':''}>↑</button><button type="button" class="secondary-button move-field" data-dir="1" ${i===total-1?'disabled':''}>↓</button>${locked?'<span class="status">Locked</span>':`<button type="button" class="danger-text remove-field">Remove</button>`}</div></article>`}
+
+async function render(){
+  const c=await load(), p=c.profile, g=c.general, restaurant=c.restaurantService
+  $('#app').innerHTML=`<main class="reservations-management"><h1>Settings</h1>${nav()}${canManage?'':'<p class="read-only-notice">Settings are read-only for this TerraPeak role.</p>'}
+  <section class="panel"><p class="eyebrow">Identity</p><h2>Business</h2><form id="businessForm"><label>Business name<input id="businessName" value="${esc(p.business_name||c.business.business_name)}" ${canManage?'':'disabled'}></label><label>Timezone<input id="timezone" value="${esc(g.timezone||c.restaurant.timezone||'Asia/Kuala_Lumpur')}" ${canManage?'':'disabled'}></label>${canManage?'<button>Save Business</button>':''}</form></section>
+  <section class="panel"><p class="eyebrow">Customer page</p><h2>Branding</h2><form id="brandForm"><label>Display name<input id="displayName" value="${esc(c.branding.restaurant_name||p.business_name||c.business.business_name)}" ${canManage?'':'disabled'}></label><label>Primary color<input type="color" id="primaryColor" value="${esc(c.branding.primary_color||'#2f5d50')}" ${canManage?'':'disabled'}></label>${canManage?'<button>Save Branding</button>':''}</form></section>
+  <section class="panel"><div class="panel-heading"><div><p class="eyebrow">Booking details</p><h2>Customer Form</h2></div><span>${c.fields.length}</span></div><p class="empty-copy">Use ↑ and ↓ to control the order customers see. Full name and phone are protected system fields.</p><div id="fieldList" class="card-list">${c.fields.map((f,i)=>fieldRow(f,i,c.fields.length)).join('')}</div>${canManage?`<form id="fieldForm" class="stacked-form"><div class="form-row"><label>Field label<input id="fieldLabel" required placeholder="Reason for visit"></label><label>Type<select id="fieldType"><option value="text">Short text</option><option value="textarea">Long text</option><option value="select">Dropdown</option><option value="checkbox">Checkbox</option></select></label></div><label class="check-label"><input id="fieldRequired" type="checkbox"> Required</label><button>Add field</button></form>`:''}</section>
+  <section class="panel"><p class="eyebrow">Confirmation</p><h2>Booking Flow</h2><form id="flowForm"><label>When a customer submits<select id="bookingBehavior" ${canManage?'':'disabled'}><option value="immediate" ${g.booking_behavior!=='request'?'selected':''}>Confirm immediately</option><option value="request" ${g.booking_behavior==='request'?'selected':''}>Create a booking request</option></select></label><label>Confirmation message<textarea id="confirmationMessage" rows="3" ${canManage?'':'disabled'}>${esc(g.confirmation_message||'Your booking request has been received.')}</textarea></label>${canManage?'<button>Save Booking Flow</button>':''}</form></section>
+  <section class="panel"><p class="eyebrow">Features</p><h2>Modules</h2><form id="modulesForm"><label class="check-label"><input type="checkbox" checked disabled> Appointments <span class="status published">Core</span></label><label class="check-label"><input id="moduleScheduled" type="checkbox" ${g.module_scheduled?'checked':''} ${canManage?'':'disabled'}> Scheduled sessions / classes</label><label class="check-label"><input id="modulePackages" type="checkbox" ${g.module_packages?'checked':''} ${canManage?'':'disabled'}> Packages</label>${canManage?'<button>Save Modules</button>':''}</form></section>
+  ${restaurant?`<section class="panel"><p class="eyebrow">Restaurant compatibility</p><h2>Restaurant booking service</h2><form id="restaurantForm"><div class="form-row"><label>Opening time<input type="time" id="openingTime" value="${esc(String(c.restaurant.opening_time||'09:00').slice(0,5))}"></label><label>Closing time<input type="time" id="closingTime" value="${esc(String(c.restaurant.closing_time||'17:00').slice(0,5))}"></label></div><div class="form-row"><label>Maximum guests<input type="number" min="1" id="capacity" value="${Number(restaurant.capacity||1)}"></label><label>Duration<input type="number" min="1" id="duration" value="${Number(restaurant.duration_minutes||60)}"></label></div>${canManage?'<button>Save Restaurant Settings</button>':''}</form></section>`:''}<p id="settingsMessage" role="status"></p></main>`
+  if(!canManage)return
+  const msg=t=>{$('#settingsMessage').textContent=t}
+  async function saveGeneral(payload){const {error}=await supabase.from('reservation_business_settings').upsert({business_id:businessId,...g,...payload},{onConflict:'business_id'});msg(error?error.message:'Settings saved.');if(!error)Object.assign(g,payload)}
+  $('#businessForm').onsubmit=async e=>{e.preventDefault();const name=$('#businessName').value.trim();const r=await supabase.from('business_profile').upsert({business_id:businessId,...p,business_name:name},{onConflict:'business_id'});if(r.error)return msg(r.error.message);await saveGeneral({timezone:$('#timezone').value.trim()})}
+  $('#brandForm').onsubmit=async e=>{e.preventDefault();const {error}=await supabase.from('restaurant_branding').upsert({business_id:businessId,...c.branding,restaurant_name:$('#displayName').value.trim(),primary_color:$('#primaryColor').value},{onConflict:'business_id'});msg(error?error.message:'Branding saved.')}
+  $('#flowForm').onsubmit=e=>{e.preventDefault();saveGeneral({booking_behavior:$('#bookingBehavior').value,confirmation_message:$('#confirmationMessage').value.trim()})}
+  $('#modulesForm').onsubmit=e=>{e.preventDefault();saveGeneral({module_appointments:true,module_scheduled:$('#moduleScheduled').checked,module_packages:$('#modulePackages').checked})}
+  $('#fieldForm').onsubmit=async e=>{e.preventDefault();const max=Math.max(0,...c.fields.map(f=>Number(f.display_order)||0));const {error}=await supabase.from('booking_custom_fields').insert({business_id:businessId,field_label:$('#fieldLabel').value.trim(),field_type:$('#fieldType').value,is_required:$('#fieldRequired').checked,display_order:max+10,is_active:true,is_locked:false});if(error)return msg(error.message);await render()}
+  $('#fieldList').onclick=async e=>{const card=e.target.closest('.settings-field');if(!card)return;const id=card.dataset.id, index=c.fields.findIndex(f=>String(f.id)===id), field=c.fields[index];if(e.target.classList.contains('remove-field')){const {error}=await supabase.from('booking_custom_fields').update({is_active:false}).eq('id',id).eq('business_id',businessId);if(error)return msg(error.message);return render()}if(e.target.classList.contains('move-field')){const other=c.fields[index+Number(e.target.dataset.dir)];if(!other)return;const a=Number(field.display_order)||index*10,b=Number(other.display_order)||(index+Number(e.target.dataset.dir))*10;const r1=await supabase.from('booking_custom_fields').update({display_order:b}).eq('id',field.id).eq('business_id',businessId);if(r1.error)return msg(r1.error.message);const r2=await supabase.from('booking_custom_fields').update({display_order:a}).eq('id',other.id).eq('business_id',businessId);if(r2.error)return msg(r2.error.message);await render()}}
+  if(restaurant)$('#restaurantForm').onsubmit=async e=>{e.preventDefault();const capacity=Number($('#capacity').value),duration=Number($('#duration').value);const s=await supabase.from('services').update({capacity,duration_minutes:duration}).eq('id',restaurant.id).eq('business_id',businessId);if(s.error)return msg(s.error.message);const r=await supabase.from('restaurant_settings').upsert({business_id:businessId,...c.restaurant,opening_time:$('#openingTime').value,closing_time:$('#closingTime').value,max_guests_per_slot:capacity,default_duration_minutes:duration},{onConflict:'business_id'});msg(r.error?r.error.message:'Restaurant settings saved.')}
 }
-
-async function render() {
-  const context = await loadContext()
-  const canManage = hasCapability('manageSettings')
-  const { business, profile, branding, settings, service } = context
-  document.querySelector('#app').innerHTML = `
-    <main class="reservations-management">
-      <h1>Settings</h1>${navigation()}
-      ${canManage ? '' : '<p class="read-only-notice">Settings are read-only for this TerraPeak role.</p>'}
-      <section class="panel"><h2>Business profile</h2><form id="businessProfileForm">
-        <label>Business name<input id="businessName" value="${escapeHtml(profile.business_name || business.business_name)}" ${canManage ? '' : 'disabled'}></label>
-        <label>Booking label<input id="bookingLabel" value="${escapeHtml(profile.booking_label || 'Reservation')}" ${canManage ? '' : 'disabled'}></label>
-        <label>Customer label<input id="customerLabel" value="${escapeHtml(profile.customer_label || 'Customer')}" ${canManage ? '' : 'disabled'}></label>
-        <label>Capacity label<input id="capacityLabel" value="${escapeHtml(profile.capacity_label || 'Guests')}" ${canManage ? '' : 'disabled'}></label>
-        <label><input type="checkbox" id="usesCapacity" ${profile.uses_capacity !== false ? 'checked' : ''} ${canManage ? '' : 'disabled'}> Allow group bookings</label>
-        ${canManage ? '<button type="submit">Save Business Profile</button>' : ''}
-      </form></section>
-      ${service ? `<section class="panel"><h2>Restaurant booking service</h2>
-        <form id="operationalSettingsForm">
-          <label>Opening time<input type="time" id="openingTime" value="${escapeHtml(String(settings.opening_time || '09:00').slice(0, 5))}" ${canManage ? '' : 'disabled'}></label>
-          <label>Closing time<input type="time" id="closingTime" value="${escapeHtml(String(settings.closing_time || '17:00').slice(0, 5))}" ${canManage ? '' : 'disabled'}></label>
-          <label>Timezone<input id="restaurantTimezone" value="${escapeHtml(settings.timezone || 'Asia/Kuala_Lumpur')}" ${canManage ? '' : 'disabled'}></label>
-          <label>Maximum guests per slot<input type="number" min="1" id="maxGuestsPerSlot" value="${Number(service.capacity || 1)}" ${canManage ? '' : 'disabled'}></label>
-          <label>Default duration<input type="number" min="1" id="defaultDurationMinutes" value="${Number(service.duration_minutes || 60)}" ${canManage ? '' : 'disabled'}></label>
-          <label>Slot interval<input type="number" min="1" id="slotIntervalMinutes" value="${Number(service.slot_interval_minutes || 30)}" ${canManage ? '' : 'disabled'}></label>
-          ${canManage ? '<button type="submit">Save Booking Service</button>' : ''}
-        </form>
-      </section>
-      <section class="panel"><h2>Brand settings</h2><form id="brandingForm">
-        <label>Display name<input id="restaurantName" value="${escapeHtml(branding.restaurant_name || profile.business_name || business.business_name)}" ${canManage ? '' : 'disabled'}></label>
-        <label>Primary color<input type="color" id="primaryColor" value="${escapeHtml(branding.primary_color || '#2f5d50')}" ${canManage ? '' : 'disabled'}></label>
-        ${canManage ? '<button type="submit">Save Brand Settings</button>' : ''}
-      </form></section>` : ''}<p id="settingsMessage" role="status"></p>
-    </main>`
-
-  if (!canManage) return
-  const message = document.querySelector('#settingsMessage')
-  document.querySelector('#businessProfileForm').onsubmit = async event => {
-    event.preventDefault()
-    const payload = {business_name:document.querySelector('#businessName').value.trim(),booking_label:document.querySelector('#bookingLabel').value.trim(),customer_label:document.querySelector('#customerLabel').value.trim(),capacity_label:document.querySelector('#capacityLabel').value.trim(),uses_capacity:document.querySelector('#usesCapacity').checked}
-    const { error } = await supabase.from('business_profile').update(payload).eq('business_id', businessId)
-    message.textContent = error ? error.message : 'Business profile saved.'
-  }
-  if (service) document.querySelector('#operationalSettingsForm').onsubmit = async event => {
-    event.preventDefault();message.textContent='Saving booking service…'
-    const capacity=Number(document.querySelector('#maxGuestsPerSlot').value),duration=Number(document.querySelector('#defaultDurationMinutes').value),interval=Number(document.querySelector('#slotIntervalMinutes').value)
-    const serviceResult=await supabase.from('services').update({capacity,duration_minutes:duration,slot_interval_minutes:interval}).eq('id',service.id).eq('business_id',businessId)
-    if(serviceResult.error){message.textContent=serviceResult.error.message;return}
-    const settingsResult=await supabase.from('restaurant_settings').update({opening_time:document.querySelector('#openingTime').value,closing_time:document.querySelector('#closingTime').value,timezone:document.querySelector('#restaurantTimezone').value.trim(),max_guests_per_slot:capacity,default_duration_minutes:duration}).eq('business_id',businessId)
-    message.textContent=settingsResult.error?settingsResult.error.message:'Restaurant booking service saved.'
-  }
-  if (service) document.querySelector('#brandingForm').onsubmit = async event => {
-    event.preventDefault()
-    const { error } = await supabase.from('restaurant_branding').update({restaurant_name:document.querySelector('#restaurantName').value.trim(),primary_color:document.querySelector('#primaryColor').value}).eq('business_id',businessId)
-    message.textContent = error ? error.message : 'Brand settings saved.'
-  }
-}
-
 await render()
