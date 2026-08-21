@@ -17,10 +17,7 @@
   <body>
     <script>
       const initialSearchParams = new URLSearchParams(window.location.search)
-      if (initialSearchParams.get('customerView') === '1') {
-        document.body.classList.add('customer-reservations-view')
-      }
-
+      if (initialSearchParams.get('customerView') === '1') document.body.classList.add('customer-reservations-view')
       if (window.location.pathname.includes('/dashboard')) {
         const internalPath = window.location.pathname.replace('/dashboard', '/admin')
         window.history.replaceState({}, '', `${internalPath}${window.location.search}${window.location.hash}`)
@@ -31,33 +28,19 @@
       const currentPath = window.location.pathname
       const currentParts = currentPath.split('/').filter(Boolean)
       const currentRoute = currentParts.slice(1).join('/')
-      const managementRoutes = new Set([
-        'admin',
-        'admin/analytics',
-        'admin/settings',
-        'admin/services',
-        'admin/staff',
-        'admin/schedule',
-        'admin/availability'
-      ])
+      const managementRoutes = new Set(['admin','admin/analytics','admin/settings','admin/services','admin/staff','admin/schedule','admin/availability'])
 
       if (currentPath === '/template-preview/physio' || currentPath === '/template-preview/physio/') {
         await import('/src/physio-template-preview-page.js')
         await import('/src/physio-modules-preview.js')
       } else if (currentPath === '/onboarding' || currentPath === '/onboarding/') {
         document.querySelector('#app').innerHTML = `
-          <main class="auth-card">
-            <h1>Reservations setup is managed by TerraPeak</h1>
-            <p>Independent Reservations account and business creation is disabled. Customer access and provisioning are managed by the TerraPeak Platform.</p>
-            <p>Please open Reservations from your TerraPeak customer workspace.</p>
-            <a href="https://dashboard.terrapeakgroup.com/dashboard/reservations">Open TerraPeak Reservations</a>
-          </main>
-        `
+          <main class="auth-card"><h1>Reservations setup is managed by TerraPeak</h1><p>Independent Reservations account and business creation is disabled. Customer access and provisioning are managed by the TerraPeak Platform.</p><p>Please open Reservations from your TerraPeak customer workspace.</p><a href="https://dashboard.terrapeakgroup.com/dashboard/reservations">Open TerraPeak Reservations</a></main>`
       } else if (currentPath.startsWith('/book/')) {
         await import('/src/public-booking.js')
+        await import('/src/public-booking-flow.js')
       } else {
         await import('/src/customer-auth-bootstrap.js')
-
         if (managementRoutes.has(currentRoute) && window.__TERRAPEAK_RESERVATIONS_READY__ === true) {
           await import('/src/trusted-management-runtime.js')
           await import('/src/management-entry.js')
@@ -70,16 +53,10 @@
         const publicPath = window.location.pathname.replace('/admin', '/dashboard')
         window.history.replaceState({}, '', `${publicPath}${window.location.search}${window.location.hash}`)
       }
-
       const currentPath = window.location.pathname
-
-      if (currentPath.includes('/dashboard/analytics')) {
-        document.title = 'TerraPeak Reservations | Analytics'
-      } else if (currentPath.includes('/dashboard/settings')) {
-        document.title = 'TerraPeak Reservations | Settings'
-      } else if (currentPath.includes('/dashboard')) {
-        document.title = 'TerraPeak Reservations'
-      }
+      if (currentPath.includes('/dashboard/analytics')) document.title = 'TerraPeak Reservations | Analytics'
+      else if (currentPath.includes('/dashboard/settings')) document.title = 'TerraPeak Reservations | Settings'
+      else if (currentPath.includes('/dashboard')) document.title = 'TerraPeak Reservations'
     </script>
   </body>
 </html>
