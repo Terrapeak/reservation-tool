@@ -21,18 +21,13 @@ async function installCustomerForm() {
       if (form) {
         const values = new FormData(form)
         const customData = { ...(args.p_custom_data || {}) }
-        if (system.customer_email) customData.customer_email = values.get('customer_email') || null
+        if (system.customer_email) customData.customer_email = values.get('customer_email') || values.get('email') || null
         custom.forEach(field => {
           const key = `custom_${field.id}`
           if (field.field_type === 'checkbox') customData[String(field.id)] = values.get(key) === 'on'
           else customData[String(field.id)] = values.get(key) || null
         })
-        args = {
-          ...args,
-          p_customer_name: values.get('customer_name') || args.p_customer_name,
-          p_phone: values.get('customer_phone') || args.p_phone,
-          p_custom_data: customData,
-        }
+        args = { ...args, p_custom_data: customData }
       }
     }
     return originalRpc(fn, args, options)
@@ -47,17 +42,14 @@ async function installCustomerForm() {
     const phone = form.querySelector('input[name="phone"]')
     const email = form.querySelector('input[name="email"]')
     if (name && system.customer_name) {
-      name.name = 'customer_name'
       name.required = Boolean(system.customer_name.is_required)
       name.closest('label').firstChild.textContent = system.customer_name.field_label
     }
     if (phone && system.customer_phone) {
-      phone.name = 'customer_phone'
       phone.required = Boolean(system.customer_phone.is_required)
       phone.closest('label').firstChild.textContent = system.customer_phone.field_label
     }
     if (email && system.customer_email) {
-      email.name = 'customer_email'
       email.required = Boolean(system.customer_email.is_required)
       email.closest('label').firstChild.textContent = system.customer_email.field_label
     } else if (system.customer_email) {
