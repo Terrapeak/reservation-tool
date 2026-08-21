@@ -1,0 +1,1 @@
+export const PUBLIC_CUSTOMER_FORM_VERSION = 1
