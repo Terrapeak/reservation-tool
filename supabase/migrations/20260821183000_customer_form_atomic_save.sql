@@ -70,6 +70,10 @@ begin
           or existing.field_options is distinct from requested_options then
           raise exception 'Locked Customer Form fields cannot be changed';
         end if;
+        update public.booking_custom_fields
+        set display_order = requested_order,
+            is_active = true
+        where id = requested_id and business_id = p_business_id;
       else
         update public.booking_custom_fields
         set field_label = requested_label,
