@@ -44,6 +44,11 @@ function updateDocumentTitle() {
     return
   }
 
+  if (path.includes('/dashboard/customer-form') || path.includes('/admin/customer-form')) {
+    document.title = 'TerraPeak Reservations | Customer Form'
+    return
+  }
+
   if (path.includes('/dashboard/settings') || path.includes('/admin/settings')) {
     document.title = 'TerraPeak Reservations | Settings'
     return
@@ -215,7 +220,8 @@ async function installUnifiedReservationsNavigation() {
     ['Team & Resources', 'dashboard/staff'],
     ['Availability', 'dashboard/availability'],
     ['Analytics', 'dashboard/analytics'],
-    ['Settings', 'dashboard/settings']
+    ['Settings', 'dashboard/settings'],
+    ['Customer Form', 'dashboard/customer-form']
   ]
 
   const activeRoute = getManagementRoute()

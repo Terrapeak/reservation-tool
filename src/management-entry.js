@@ -7,6 +7,7 @@ if (!runtime || runtime.source !== 'terrapeak-dashboard') {
 const route = window.location.pathname.split('/').filter(Boolean).slice(1).join('/')
 const unifiedBookingRoutes = new Set(['admin', 'admin/analytics'])
 const legacySettingsRoutes = new Set(['admin/settings'])
+const customerFormRoutes = new Set(['admin/customer-form'])
 const universalRoutes = new Set([
   'admin/services',
   'admin/staff',
@@ -17,6 +18,7 @@ const universalRoutes = new Set([
 if (
   !unifiedBookingRoutes.has(route) &&
   !legacySettingsRoutes.has(route) &&
+  !customerFormRoutes.has(route) &&
   !universalRoutes.has(route)
 ) {
   throw new Error(`Unsupported Reservations management route: ${route}`)
@@ -33,6 +35,11 @@ if (legacySettingsRoutes.has(route)) {
   await import('./restaurant-settings.js')
   await import('./admin-enhancements.js')
   await import('./custom-field-option-repair.js')
+}
+
+if (customerFormRoutes.has(route)) {
+  await import('./customer-form-admin.js')
+  await import('./admin-enhancements.js')
 }
 
 if (universalRoutes.has(route)) {
