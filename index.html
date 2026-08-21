@@ -43,6 +43,7 @@
 
       if (currentPath === '/template-preview/physio' || currentPath === '/template-preview/physio/') {
         await import('/src/physio-template-preview-page.js')
+        await import('/src/physio-modules-preview.js')
       } else if (currentPath === '/onboarding' || currentPath === '/onboarding/') {
         document.querySelector('#app').innerHTML = `
           <main class="auth-card">
