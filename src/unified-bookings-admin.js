@@ -24,7 +24,7 @@ function escapeHtml(value = '') {
 
 function statusLabel(status) {
   return ({
-    pending: 'Pending',
+    pending: 'Awaiting confirmation',
     confirmed: 'Confirmed',
     completed: 'Completed',
     cancelled: 'Cancelled',
@@ -76,6 +76,7 @@ async function renderBookings() {
       <div class="summary-grid">
         <div class="summary-card"><h3>Bookings</h3><p>${rows.length}</p></div>
         <div class="summary-card"><h3>Guests / Places</h3><p>${capacity}</p></div>
+        <div class="summary-card"><h3>Awaiting confirmation</h3><p>${count('pending')}</p></div>
         <div class="summary-card"><h3>Confirmed</h3><p>${count('confirmed')}</p></div>
         <div class="summary-card"><h3>Completed</h3><p>${count('completed')}</p></div>
         <div class="summary-card"><h3>Cancelled</h3><p>${count('cancelled')}</p></div>
@@ -102,6 +103,7 @@ async function renderBookings() {
         </div>
         ${canManage ? `
           <div class="session-actions">
+            ${row.status === 'pending' ? `<button type="button" data-action="confirmed" data-key="${escapeHtml(`${row.source}:${row.id}`)}">Confirm appointment</button>` : ''}
             ${['pending', 'confirmed'].includes(row.status) ? `<button type="button" data-action="completed" data-key="${escapeHtml(`${row.source}:${row.id}`)}">Complete</button><button type="button" data-action="no_show" data-key="${escapeHtml(`${row.source}:${row.id}`)}">No show</button><button type="button" data-action="cancelled" data-key="${escapeHtml(`${row.source}:${row.id}`)}">Cancel</button>` : ''}
           </div>
         ` : ''}
@@ -132,7 +134,7 @@ async function renderBookings() {
     if (!booking) return
 
     const action = button.dataset.action
-    if (!['completed', 'no_show', 'cancelled'].includes(action)) return
+    if (!['confirmed', 'completed', 'no_show', 'cancelled'].includes(action)) return
     const result = await updateManagedBookingStatus(booking, action)
 
     if (result?.error) return window.alert(result.error.message)
@@ -206,6 +208,7 @@ async function renderAnalytics() {
         <div class="summary-grid">
           <div class="summary-card"><h3>Total Bookings</h3><p>${rows.length}</p></div>
           <div class="summary-card"><h3>Guests / Places</h3><p>${capacity}</p></div>
+          <div class="summary-card"><h3>Awaiting confirmation</h3><p>${count('pending')}</p></div>
           <div class="summary-card"><h3>Confirmed</h3><p>${count('confirmed')}</p></div>
           <div class="summary-card"><h3>Completed</h3><p>${count('completed')}</p></div>
           <div class="summary-card"><h3>Cancelled</h3><p>${count('cancelled')}</p></div>
