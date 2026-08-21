@@ -1,3 +1,5 @@
+import { RESERVATIONS_MANAGEMENT_ROUTE_SET, RESERVATIONS_ROUTE_GROUPS } from './reservations-routes.js'
+
 const runtime = window.__TERRAPEAK_RESERVATIONS_RUNTIME__
 
 if (!runtime || runtime.source !== 'terrapeak-dashboard') {
@@ -5,44 +7,30 @@ if (!runtime || runtime.source !== 'terrapeak-dashboard') {
 }
 
 const route = window.location.pathname.split('/').filter(Boolean).slice(1).join('/')
-const unifiedBookingRoutes = new Set(['admin', 'admin/analytics'])
-const legacySettingsRoutes = new Set(['admin/settings'])
-const customerFormRoutes = new Set(['admin/customer-form'])
-const universalRoutes = new Set([
-  'admin/services',
-  'admin/staff',
-  'admin/schedule',
-  'admin/availability'
-])
 
-if (
-  !unifiedBookingRoutes.has(route) &&
-  !legacySettingsRoutes.has(route) &&
-  !customerFormRoutes.has(route) &&
-  !universalRoutes.has(route)
-) {
+if (!RESERVATIONS_MANAGEMENT_ROUTE_SET.has(route)) {
   throw new Error(`Unsupported Reservations management route: ${route}`)
 }
 
 await import('./customer-tenant-lock.js')
 await import('./business-name-unification.js')
 
-if (unifiedBookingRoutes.has(route)) {
+if (RESERVATIONS_ROUTE_GROUPS.unifiedBookings.has(route)) {
   await import('./unified-bookings-admin.js')
 }
 
-if (legacySettingsRoutes.has(route)) {
+if (RESERVATIONS_ROUTE_GROUPS.settings.has(route)) {
   await import('./restaurant-settings.js')
   await import('./admin-enhancements.js')
   await import('./custom-field-option-repair.js')
 }
 
-if (customerFormRoutes.has(route)) {
+if (RESERVATIONS_ROUTE_GROUPS.customerForm.has(route)) {
   await import('./customer-form-admin.js')
   await import('./admin-enhancements.js')
 }
 
-if (universalRoutes.has(route)) {
+if (RESERVATIONS_ROUTE_GROUPS.universal.has(route)) {
   await import('./universal-booking-admin.js')
   await import('./reservation-template-preview.js')
 }
