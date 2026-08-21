@@ -1,0 +1,1 @@
+`20260821232000_public_customer_form.sql` exposes only active booking field definitions through a read-only public RPC and preserves booking submission through the existing canonical booking function.

@@ -1,0 +1,32 @@
+.customer-form-fields {
+  display: grid;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.customer-form-fields label {
+  display: grid;
+  gap: .45rem;
+}
+
+.customer-form-fields input,
+.customer-form-fields textarea,
+.customer-form-fields select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.customer-form-fields textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+.customer-form-fields .booking-checkbox {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+}
+
+.customer-form-fields .booking-checkbox input {
+  width: auto;
+}

@@ -1,0 +1,1 @@
+The dynamic public Customer Form is intentionally layered onto the existing canonical restaurant-compatible slot engine. This keeps existing availability and booking RPCs stable while template-specific presentation is rolled out. Industry-specific scheduling engines can replace the adapter later without changing the Customer Form contract.

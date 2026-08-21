@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/src/universal-booking-admin.css" />
     <link rel="stylesheet" href="/src/service-configuration.css" />
     <link rel="stylesheet" href="/src/public-booking.css" />
+    <link rel="stylesheet" href="/src/public-customer-form.css" />
     <link rel="stylesheet" href="/src/owner-onboarding.css" />
     <link rel="stylesheet" href="/src/public-ui.css" />
     <link rel="stylesheet" href="/src/customer-view.css" />
@@ -39,6 +40,7 @@
           <main class="auth-card"><h1>Reservations setup is managed by TerraPeak</h1><p>Independent Reservations account and business creation is disabled. Customer access and provisioning are managed by the TerraPeak Platform.</p><p>Please open Reservations from your TerraPeak customer workspace.</p><a href="https://dashboard.terrapeakgroup.com/dashboard/reservations">Open TerraPeak Reservations</a></main>`
       } else if (currentPath.startsWith('/book/')) {
         await import('/src/public-booking.js')
+        await import('/src/public-customer-form.js')
         await import('/src/public-booking-flow.js')
       } else {
         await import('/src/customer-auth-bootstrap.js')
