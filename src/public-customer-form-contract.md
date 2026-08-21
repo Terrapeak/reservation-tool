@@ -1,0 +1,1 @@
+Public booking renders active fields in display order, maps customer_name/customer_phone/customer_email to canonical booking identity fields, and stores non-system responses in bookings.custom_data by field id.
