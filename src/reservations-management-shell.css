@@ -96,6 +96,245 @@
   background: transparent;
 }
 
+/* Customer Form editor */
+.customer-form-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.85fr);
+  align-items: start;
+  gap: 22px;
+  margin-top: 18px;
+}
+
+.customer-form-editor,
+.customer-form-preview {
+  min-width: 0;
+}
+
+.customer-form-preview {
+  position: sticky;
+  top: 18px;
+}
+
+.customer-form-field-list {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0 22px;
+}
+
+.customer-form-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  padding: 16px;
+  border: 1px solid #dfe6ee;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.field-editor-main {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.4fr) minmax(130px, 0.8fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.field-editor-main > label:not(.check-label) {
+  display: grid;
+  gap: 6px;
+  color: #40536c;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.field-editor-main input[type="text"],
+.field-editor-main input:not([type]),
+.field-editor-main select,
+.customer-form-add input,
+.customer-form-add select,
+.live-form-preview input,
+.live-form-preview select,
+.live-form-preview textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+}
+
+.field-editor-main input:disabled,
+.field-editor-main select:disabled {
+  background: #f5f7fa;
+  color: #66758a;
+  cursor: not-allowed;
+}
+
+.field-editor-main .check-label {
+  align-self: center;
+  margin: 0 0 9px;
+  white-space: nowrap;
+}
+
+.field-meta {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 2px;
+}
+
+.field-meta strong {
+  color: #17233a;
+  font-size: 0.96rem;
+  line-height: 1.25;
+}
+
+.field-meta small {
+  color: #6b7b90;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.field-order-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding-top: 21px;
+}
+
+.field-order-actions button {
+  min-width: 38px;
+  min-height: 38px;
+  padding: 7px 10px;
+}
+
+.field-order-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.field-order-actions .status {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #eef2f6;
+  color: #5a687b;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.customer-form-add {
+  margin-top: 8px;
+  padding: 18px;
+  border: 1px dashed #c7d2df;
+  border-radius: 12px;
+  background: #fafbfd;
+}
+
+.customer-form-add h3 {
+  margin: 0 0 14px;
+}
+
+.customer-form-add .form-row {
+  display: grid;
+  grid-template-columns: 1fr 180px;
+  gap: 12px;
+}
+
+.customer-form-add label:not(.check-label) {
+  display: grid;
+  gap: 6px;
+  color: #40536c;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.customer-form-add .check-label {
+  display: block;
+  margin: 12px 0;
+}
+
+.customer-form-savebar {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 20px -2px -2px;
+  padding: 14px 2px 2px;
+  border-top: 1px solid #e5eaf0;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.88), #fff 30%);
+}
+
+.customer-form-preview::before {
+  content: 'Customer view';
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #edf4f1;
+  color: #2f5d50;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.live-form-preview {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid #dfe6ee;
+  border-radius: 14px;
+  background: #fbfcfd;
+  box-shadow: 0 10px 26px rgba(23, 35, 58, 0.06);
+}
+
+.live-form-preview > label:not(.preview-check) {
+  display: grid;
+  gap: 7px;
+  color: #253750;
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.live-form-preview input:disabled,
+.live-form-preview select:disabled,
+.live-form-preview textarea:disabled {
+  opacity: 1;
+  background: #fff;
+  color: #6b7b90;
+}
+
+.preview-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #253750;
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.preview-check input {
+  width: auto;
+  min-height: 0;
+}
+
+@media (max-width: 980px) {
+  .customer-form-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .customer-form-preview {
+    position: static;
+  }
+}
+
 @media (max-width: 720px) {
   .reservations-shell-header {
     padding: 18px 16px 12px;
@@ -107,5 +346,43 @@
 
   .reservations-shell-content {
     padding: 14px 12px 20px;
+  }
+
+  .customer-form-layout {
+    gap: 14px;
+  }
+
+  .customer-form-field {
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+
+  .field-editor-main {
+    grid-template-columns: 1fr;
+  }
+
+  .field-editor-main .check-label {
+    margin: 0;
+  }
+
+  .field-order-actions {
+    justify-content: flex-start;
+    padding-top: 0;
+  }
+
+  .customer-form-add .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .customer-form-savebar {
+    flex-wrap: wrap;
+  }
+
+  .customer-form-savebar button {
+    flex: 1 1 160px;
+  }
+
+  .live-form-preview {
+    padding: 16px;
   }
 }
