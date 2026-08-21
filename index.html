@@ -25,10 +25,11 @@
     </script>
     <div id="app"></div>
     <script type="module">
+      import { RESERVATIONS_MANAGEMENT_ROUTE_SET } from '/src/reservations-routes.js'
+
       const currentPath = window.location.pathname
       const currentParts = currentPath.split('/').filter(Boolean)
       const currentRoute = currentParts.slice(1).join('/')
-      const managementRoutes = new Set(['admin','admin/analytics','admin/settings','admin/customer-form','admin/services','admin/staff','admin/schedule','admin/availability'])
 
       if (currentPath === '/template-preview/physio' || currentPath === '/template-preview/physio/') {
         await import('/src/physio-template-preview-page.js')
@@ -41,7 +42,7 @@
         await import('/src/public-booking-flow.js')
       } else {
         await import('/src/customer-auth-bootstrap.js')
-        if (managementRoutes.has(currentRoute) && window.__TERRAPEAK_RESERVATIONS_READY__ === true) {
+        if (RESERVATIONS_MANAGEMENT_ROUTE_SET.has(currentRoute) && window.__TERRAPEAK_RESERVATIONS_READY__ === true) {
           await import('/src/trusted-management-runtime.js')
           await import('/src/management-entry.js')
           if (currentRoute === 'admin/services') await import('/src/service-test-cleanup.js')
@@ -56,6 +57,7 @@
       const currentPath = window.location.pathname
       if (currentPath.includes('/dashboard/analytics')) document.title = 'TerraPeak Reservations | Analytics'
       else if (currentPath.includes('/dashboard/settings')) document.title = 'TerraPeak Reservations | Settings'
+      else if (currentPath.includes('/dashboard/customer-form')) document.title = 'TerraPeak Reservations | Customer Form'
       else if (currentPath.includes('/dashboard')) document.title = 'TerraPeak Reservations'
     </script>
   </body>
