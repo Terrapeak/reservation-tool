@@ -28,7 +28,7 @@
       const currentPath = window.location.pathname
       const currentParts = currentPath.split('/').filter(Boolean)
       const currentRoute = currentParts.slice(1).join('/')
-      const managementRoutes = new Set(['admin','admin/analytics','admin/settings','admin/services','admin/staff','admin/schedule','admin/availability'])
+      const managementRoutes = new Set(['admin','admin/analytics','admin/settings','admin/customer-form','admin/services','admin/staff','admin/schedule','admin/availability'])
 
       if (currentPath === '/template-preview/physio' || currentPath === '/template-preview/physio/') {
         await import('/src/physio-template-preview-page.js')
