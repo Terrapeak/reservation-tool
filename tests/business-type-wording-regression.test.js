@@ -20,13 +20,14 @@ test('business type wording avoids mutation observer self loops', () => {
 test('customer-facing booking labels come from business type at source', () => {
   assert.match(bookingSource, /const businessTypeLabel = business =>/)
   assert.match(
-    bookingSource,
-    /<span class=\\"booking-type\\">'\+esc\(businessTypeLabel\(business\)\)/
-  )
-  assert.match(
-    bookingSource,
-    /<p class=\\"booking-kicker\\">'\+esc\(businessTypeLabel\(business\)\)/
-  )
+  bookingSource,
+  /<span class="booking-type">'\+esc\(businessTypeLabel\(business\)\)/
+)
+
+assert.match(
+  bookingSource,
+  /<p class="booking-kicker">'\+esc\(businessTypeLabel\(business\)\)/
+)
 })
 
 test('restaurant booking type remains an internal engine routing decision', () => {
