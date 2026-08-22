@@ -17,18 +17,56 @@ function displayValue(value) {
   if (typeof value === 'object') return JSON.stringify(value)
   return String(value)
 }
-function detailRow(label, value) { return `<div class="booking-detail-row"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(displayValue(value))}</span></div>` }
+function detailItem(label, value) { return `<div class="booking-detail-item"><span class="booking-detail-label">${escapeHtml(label)}</span><strong class="booking-detail-value">${escapeHtml(displayValue(value))}</strong></div>` }
+function detailSection(title, content, className='') { return `<section class="booking-detail-section ${className}"><h4>${escapeHtml(title)}</h4><div class="booking-detail-grid">${content}</div></section>` }
 function bookingDetails(row) {
-  const custom = (row.customFields || []).map(field => detailRow(field.label, field.value)).join('')
+  const appointment = detailItem('Reference', row.reference) + detailItem('Service', row.serviceName) + detailItem('Date', row.bookingDate) + detailItem('Time', row.bookingTime) + detailItem('Status', statusLabel(row.status))
+  const customer = detailItem('Name', row.customerName) + detailItem('Phone', row.customerPhone) + detailItem('Email', row.customerEmail)
+  const custom = (row.customFields || []).map(field => detailItem(field.label, field.value)).join('')
+  const notes = row.notes ? `<section class="booking-notes"><h4>Notes</h4><p>${escapeHtml(displayValue(row.notes))}</p></section>` : ''
   return `<section class="booking-detail-panel" data-detail-key="${escapeHtml(`${row.source}:${row.id}`)}" hidden>
-    <div class="booking-detail-grid">
-      ${detailRow('Reference', row.reference)}${detailRow('Service', row.serviceName)}${detailRow('Date', row.bookingDate)}${detailRow('Time', row.bookingTime)}${detailRow('Status', statusLabel(row.status))}
-      ${detailRow('Customer', row.customerName)}${detailRow('Phone', row.customerPhone)}${detailRow('Email', row.customerEmail)}${detailRow('Notes', row.notes)}${custom}
+    <div class="booking-detail-columns">
+      ${detailSection('Appointment', appointment)}
+      ${detailSection('Customer', customer)}
     </div>
+    ${custom ? detailSection('Booking details', custom, 'booking-custom-details') : ''}
+    ${notes}
   </section>`
 }
 
+function ensureBookingDetailStyles() {
+  if (document.getElementById('bookingDetailStyles')) return
+  const style = document.createElement('style')
+  style.id = 'bookingDetailStyles'
+  style.textContent = `
+    #adminReservations .booking-card-admin{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:start!important;gap:14px 24px!important}
+    #adminReservations .booking-card-summary{min-width:0;cursor:pointer;padding:2px 0}
+    #adminReservations .booking-card-summary:focus-visible{outline:3px solid rgba(49,91,126,.28);outline-offset:5px;border-radius:6px}
+    #adminReservations .booking-card-summary h3{font-size:15px!important;margin-bottom:5px!important}
+    #adminReservations .booking-card-summary p{line-height:1.35}
+    #adminReservations .booking-detail-hint{margin-top:7px!important;color:#315b7e;font-weight:700;font-size:12px}
+    #adminReservations .session-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;align-self:center}
+    #adminReservations .booking-detail-panel{grid-column:1/-1;width:100%;box-sizing:border-box;margin-top:4px;padding-top:20px;border-top:1px solid #dbe3e9}
+    #adminReservations .booking-detail-panel[hidden]{display:none!important}
+    #adminReservations .booking-detail-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+    #adminReservations .booking-detail-section{min-width:0;padding:18px;border:1px solid #dbe3e9;border-radius:10px;background:#f8fafb}
+    #adminReservations .booking-detail-section h4,#adminReservations .booking-notes h4{margin:0 0 14px;color:#1f3040;font-size:13px;text-transform:uppercase;letter-spacing:.06em}
+    #adminReservations .booking-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 22px}
+    #adminReservations .booking-detail-item{min-width:0}
+    #adminReservations .booking-detail-label{display:block;margin-bottom:4px;color:#66798a;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+    #adminReservations .booking-detail-value{display:block;color:#1f3040;font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+    #adminReservations .booking-custom-details{grid-column:1/-1;margin-top:16px;background:#fff}
+    #adminReservations .booking-custom-details .booking-detail-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+    #adminReservations .booking-notes{margin-top:16px;padding:16px 18px;border-left:3px solid #cfd9e2;background:#f8fafb;border-radius:8px}
+    #adminReservations .booking-notes p{margin:0!important;color:#1f3040;line-height:1.5;white-space:pre-wrap}
+    @media(max-width:760px){#adminReservations .booking-card-admin{grid-template-columns:1fr!important}#adminReservations .session-actions{justify-content:flex-start}#adminReservations .booking-detail-columns,#adminReservations .booking-custom-details .booking-detail-grid{grid-template-columns:1fr}#adminReservations .booking-detail-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:480px){#adminReservations .booking-detail-grid{grid-template-columns:1fr}}
+  `
+  document.head.appendChild(style)
+}
+
 async function renderBookings() {
+  ensureBookingDetailStyles()
   const canManage = hasCapability('manageBookings')
   document.querySelector('#app').innerHTML = `<main class="reservations-management">
     <header class="management-page-heading"><div><h1>Bookings</h1><p>Search, review and update customer bookings.</p></div></header>
