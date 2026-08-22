@@ -42,6 +42,7 @@
         await import('/src/public-booking.js')
         await import('/src/public-customer-form.js')
         await import('/src/public-booking-flow.js')
+        await import('/src/public-business-presentation.js')
       } else {
         await import('/src/customer-auth-bootstrap.js')
         if (RESERVATIONS_MANAGEMENT_ROUTE_SET.has(currentRoute) && window.__TERRAPEAK_RESERVATIONS_READY__ === true) {
