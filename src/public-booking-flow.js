@@ -6,12 +6,12 @@ const businessSlug = route[0]?.toLowerCase() === 'book' ? route[1] : null
 if (businessSlug) installBookingFlowWording()
 
 const TYPE_WORDING = {
-  physiotherapy: { label: 'Physiotherapy', unit: 'appointment', confirm: 'Your physiotherapy appointment has been reserved.' },
-  dental: { label: 'Dental', unit: 'appointment', confirm: 'Your dental appointment has been reserved.' },
-  salon: { label: 'Salon / beauty', unit: 'appointment', confirm: 'Your appointment has been reserved.' },
-  learning_centre: { label: 'Learning centre', unit: 'place', confirm: 'Your place has been reserved.' },
-  restaurant: { label: 'Restaurant', unit: 'guest', confirm: null },
-  general: { label: 'Appointment', unit: 'appointment', confirm: 'Your appointment has been reserved.' },
+  physiotherapy: { label: 'Physiotherapy', confirm: 'Your physiotherapy appointment has been reserved.' },
+  dental: { label: 'Dental', confirm: 'Your dental appointment has been reserved.' },
+  salon: { label: 'Salon / beauty', confirm: 'Your appointment has been reserved.' },
+  learning_centre: { label: 'Learning centre', confirm: 'Your place has been reserved.' },
+  restaurant: { label: 'Restaurant', confirm: null },
+  general: { label: 'Appointment', confirm: 'Your appointment has been reserved.' },
 }
 
 async function installBookingFlowWording() {
@@ -32,14 +32,18 @@ async function installBookingFlowWording() {
   const requestMode = settings?.booking_behavior === 'request'
 
   function apply() {
-    const kicker = document.querySelector('.booking-kicker')
-    if (kicker && !isRestaurantBusiness && kicker.textContent.trim().toLowerCase() === 'restaurant') {
-      kicker.textContent = wording.label
-    }
-
     if (!isRestaurantBusiness) {
+      // Fix both the service-list card badge and the selected-service kicker.
+      document.querySelectorAll('.booking-type, .booking-kicker').forEach(label => {
+        if (label.textContent.trim().toLowerCase() === 'restaurant' && label.textContent !== wording.label) {
+          label.textContent = wording.label
+        }
+      })
+
       document.querySelectorAll('.slot small').forEach(small => {
-        if (/guest(s)? available/i.test(small.textContent)) small.textContent = 'Available'
+        if (/guest(s)? available/i.test(small.textContent) && small.textContent !== 'Available') {
+          small.textContent = 'Available'
+        }
       })
     }
 
@@ -49,15 +53,18 @@ async function installBookingFlowWording() {
     if (!isRestaurantBusiness) {
       const quantity = form.elements?.quantity
       const quantityLabel = quantity?.closest('label')
-      if (quantity) quantity.value = '1'
-      if (quantityLabel) quantityLabel.hidden = true
+      if (quantity && quantity.value !== '1') quantity.value = '1'
+      if (quantityLabel && !quantityLabel.hidden) quantityLabel.hidden = true
 
       const notes = form.elements?.notes
       const notesLabel = notes?.closest('label')
-      if (notesLabel) notesLabel.hidden = true
+      if (notesLabel && !notesLabel.hidden) notesLabel.hidden = true
 
       const submit = form.querySelector('button.booking-confirm[type="submit"]')
-      if (submit && !submit.disabled) submit.textContent = requestMode ? 'Request appointment' : 'Confirm booking'
+      const submitLabel = requestMode ? 'Request appointment' : 'Confirm booking'
+      // Guard text writes: MutationObserver watches characterData, so repeatedly assigning
+      // the same text can create a self-sustaining mutation loop and starve async slot loading.
+      if (submit && !submit.disabled && submit.textContent !== submitLabel) submit.textContent = submitLabel
     }
 
     const message = form.querySelector('#bookingMessage')
@@ -74,9 +81,10 @@ async function installBookingFlowWording() {
 
     if (!isRestaurantBusiness) {
       const successKicker = success.querySelector('.booking-kicker')
-      if (successKicker) successKicker.textContent = requestMode ? 'Appointment request received' : 'Booking confirmed'
+      const successLabel = requestMode ? 'Appointment request received' : 'Booking confirmed'
+      if (successKicker && successKicker.textContent !== successLabel) successKicker.textContent = successLabel
       const restaurantConfirmation = paragraphs.find(p => /your table for .* has been reserved/i.test(p.textContent))
-      if (restaurantConfirmation) restaurantConfirmation.textContent = wording.confirm
+      if (restaurantConfirmation && restaurantConfirmation.textContent !== wording.confirm) restaurantConfirmation.textContent = wording.confirm
     }
 
     if (requestMode) {
