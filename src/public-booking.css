@@ -8,77 +8,13 @@
 .booking-form{margin-top:20px;background:#fff;border:1px solid #dce7df;border-radius:20px;padding:28px}.form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.booking-form>label{margin-top:14px}.booking-form textarea{min-height:86px}.booking-form button{margin-top:18px;border:0;border-radius:10px;background:#285b3b;color:#fff;padding:13px 20px;font-weight:800}.booking-error{text-align:center;padding-top:20vh}
 @media(max-width:700px){.booking-shell{width:min(100% - 20px,1040px)}.booking-header span{display:none}.booking-hero{padding-top:44px}.calendar-panel,.form-grid{grid-template-columns:1fr}}
 .session-grid{display:grid;gap:10px}.session-choice{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:center;width:100%;padding:14px 16px;border:1px solid #dce7df;border-radius:12px;background:#fff;color:#183126;text-align:left;cursor:pointer}.session-choice span{color:#4f6658}.session-choice small{color:#64756b}.session-choice:hover,.session-choice.selected{border-color:#285b3b;background:#f0f7f2}.booking-form>label input[type="number"]{max-width:160px}@media(max-width:700px){.session-choice{grid-template-columns:1fr}.session-choice span,.session-choice small{display:block}}
-
-.booking-manager{margin-top:24px;background:#fff;border:1px solid #dce7df;border-radius:20px;padding:0 28px 24px}
-.booking-manager summary{padding:22px 0;font-weight:800;cursor:pointer;color:#285b3b}
-.manager-lookup p,.manager-current>p{color:#596a60}.manager-lookup button,.manager-actions button{margin-top:18px;border:0;border-radius:10px;background:#285b3b;color:#fff;padding:12px 18px;font-weight:800;cursor:pointer}
-.manager-current{border-top:1px solid #dce7df;padding-top:22px}.manager-current h3{font-size:1.4rem;margin:.3rem 0}.manager-actions{display:flex;gap:10px;flex-wrap:wrap}.manager-actions .danger{background:#9d3028}
-#managerOptions{margin-top:20px}#managerOptions>label{display:grid;gap:7px;max-width:260px;font-weight:700}#managerOptions input{font:inherit;border:1px solid #bdcec2;border-radius:10px;padding:12px;margin-bottom:14px}
-.manager-slot{display:grid;gap:3px}.manager-slot small{font-weight:500}.manager-message{min-height:1.2em}
-.restaurant-calendar .slot,.calendar-panel .slot{display:grid;gap:3px}.calendar-panel .slot small{font-size:.72rem;font-weight:500}
-
-.booking-form .booking-confirm{display:block!important;visibility:visible!important;opacity:1!important;width:100%;margin-top:18px;border:0;border-radius:10px;background:#285b3b;color:#fff;padding:14px 20px;font:inherit;font-weight:800;cursor:pointer}
-.booking-form .booking-confirm:disabled{opacity:.65!important;cursor:wait}
-
-/* Keep the public booking controls independent from the legacy public form theme. */
-body.public-booking-page .booking-shell .session-choice{
-  display:grid!important;
-  background:#fff!important;
-  color:#183126!important;
-  border-color:#dce7df!important;
-  opacity:1!important;
-  visibility:visible!important;
-}
-body.public-booking-page .booking-shell .session-choice strong{
-  display:block!important;
-  color:#183126!important;
-  opacity:1!important;
-  visibility:visible!important;
-}
-body.public-booking-page .booking-shell .session-choice:hover,
-body.public-booking-page .booking-shell .session-choice.selected{
-  background:#f0f7f2!important;
-  color:#183126!important;
-  border-color:#285b3b!important;
-}
-body.public-booking-page .booking-shell .booking-form .booking-confirm{
-  display:block!important;
-  visibility:visible!important;
-  opacity:1!important;
-  width:100%!important;
-  min-height:48px!important;
-  margin-top:18px!important;
-  border:1px solid #285b3b!important;
-  background:#285b3b!important;
-  color:#fff!important;
-}
-body.public-booking-page .booking-shell .booking-form .booking-confirm:hover{
-  background:#1f472f!important;
-  color:#fff!important;
-}
-body.public-booking-page .booking-shell .slot{
-  background:#f5faf6!important;
-  color:#285b3b!important;
-  border-color:#8bb49a!important;
-}
-body.public-booking-page .booking-shell .slot:hover,
-body.public-booking-page .booking-shell .slot.selected{
-  background:#285b3b!important;
-  color:#fff!important;
-}
-body.public-booking-page :is(a,button,input,textarea,summary):focus-visible{
-  outline:3px solid rgba(40,91,59,.28);
-  outline-offset:3px;
-}
-@media(max-width:700px){
-  .booking-shell{padding-top:14px;padding-bottom:42px}
-  .booking-header{padding:14px 16px}
-  .booking-hero{padding:34px 4px 26px}
-  .booking-hero h1,.booking-profile h1{font-size:clamp(2rem,11vw,3rem)}
-  .booking-profile{align-items:flex-start;flex-direction:column;padding:22px}
-  .calendar-panel,.booking-form{padding:20px}
-  .booking-manager{padding:0 20px 20px}
-  .calendar-panel input,.booking-form input,.booking-form textarea,
-  #managerOptions input{min-height:46px;box-sizing:border-box;width:100%}
-  .slot,.manager-lookup button,.manager-actions button{min-height:44px}
-}
+.booking-manager{margin-top:24px;background:#fff;border:1px solid #dce7df;border-radius:20px;padding:0 28px 24px}.booking-manager summary{padding:22px 0;font-weight:800;cursor:pointer;color:#285b3b}.manager-lookup p,.manager-current>p{color:#596a60}.manager-lookup button,.manager-actions button{margin-top:18px;border:0;border-radius:10px;background:#285b3b;color:#fff;padding:12px 18px;font-weight:800;cursor:pointer}.manager-current{border-top:1px solid #dce7df;padding-top:22px}.manager-current h3{font-size:1.4rem;margin:.3rem 0}.manager-actions{display:flex;gap:10px;flex-wrap:wrap}.manager-actions .danger{background:#9d3028}#managerOptions{margin-top:20px}#managerOptions>label{display:grid;gap:7px;max-width:260px;font-weight:700}#managerOptions input{font:inherit;border:1px solid #bdcec2;border-radius:10px;padding:12px;margin-bottom:14px}.manager-slot{display:grid;gap:3px}.manager-slot small{font-weight:500}.manager-message{min-height:1.2em}.restaurant-calendar .slot,.calendar-panel .slot{display:grid;gap:3px}.calendar-panel .slot small{font-size:.72rem;font-weight:500}
+.booking-form .booking-confirm{display:block!important;visibility:visible!important;opacity:1!important;width:100%;margin-top:18px;border:0;border-radius:10px;background:#285b3b;color:#fff;padding:14px 20px;font:inherit;font-weight:800;cursor:pointer}.booking-form .booking-confirm:disabled{opacity:.65!important;cursor:wait}
+body.public-booking-page .booking-shell .session-choice{display:grid!important;background:#fff!important;color:#183126!important;border-color:#dce7df!important;opacity:1!important;visibility:visible!important}body.public-booking-page .booking-shell .session-choice strong{display:block!important;color:#183126!important;opacity:1!important;visibility:visible!important}body.public-booking-page .booking-shell .session-choice:hover,body.public-booking-page .booking-shell .session-choice.selected{background:#f0f7f2!important;color:#183126!important;border-color:#285b3b!important}body.public-booking-page .booking-shell .booking-form .booking-confirm{display:block!important;visibility:visible!important;opacity:1!important;width:100%!important;min-height:48px!important;margin-top:18px!important;border:1px solid #285b3b!important;background:#285b3b!important;color:#fff!important}body.public-booking-page .booking-shell .booking-form .booking-confirm:hover{background:#1f472f!important;color:#fff!important}body.public-booking-page .booking-shell .slot{background:#f5faf6!important;color:#285b3b!important;border-color:#8bb49a!important}body.public-booking-page .booking-shell .slot:hover,body.public-booking-page .booking-shell .slot.selected{background:#285b3b!important;color:#fff!important}body.public-booking-page :is(a,button,input,textarea,summary):focus-visible{outline:3px solid rgba(40,91,59,.28);outline-offset:3px}
+/* Business-type presentation: keep restaurant engine internals, but never expose the wrong vertical label. */
+body.booking-business-physiotherapy .booking-type{font-size:0}body.booking-business-physiotherapy .booking-type::after{content:'PHYSIOTHERAPY';font-size:.72rem}
+body.booking-business-dental .booking-type{font-size:0}body.booking-business-dental .booking-type::after{content:'DENTAL';font-size:.72rem}
+body.booking-business-salon .booking-type{font-size:0}body.booking-business-salon .booking-type::after{content:'SALON / BEAUTY';font-size:.72rem}
+body.booking-business-learning_centre .booking-type{font-size:0}body.booking-business-learning_centre .booking-type::after{content:'LEARNING CENTRE';font-size:.72rem}
+body.booking-business-general .booking-type{font-size:0}body.booking-business-general .booking-type::after{content:'APPOINTMENT';font-size:.72rem}
+@media(max-width:700px){.booking-shell{padding-top:14px;padding-bottom:42px}.booking-header{padding:14px 16px}.booking-hero{padding:34px 4px 26px}.booking-hero h1,.booking-profile h1{font-size:clamp(2rem,11vw,3rem)}.booking-profile{align-items:flex-start;flex-direction:column;padding:22px}.calendar-panel,.booking-form{padding:20px}.booking-manager{padding:0 20px 20px}.calendar-panel input,.booking-form input,.booking-form textarea,#managerOptions input{min-height:46px;box-sizing:border-box;width:100%}.slot,.manager-lookup button,.manager-actions button{min-height:44px}}
