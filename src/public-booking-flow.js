@@ -33,19 +33,12 @@ async function installBookingFlowWording() {
 
   function apply() {
     if (!isRestaurantBusiness) {
-      // Fix both the service-list card badge and the selected-service kicker.
-      document.querySelectorAll('.booking-type, .booking-kicker').forEach(label => {
-        if (label.textContent.trim().toLowerCase() === 'restaurant' && label.textContent !== wording.label) {
-          label.textContent = wording.label
-        }
-      })
-
-      document.querySelectorAll('.slot small').forEach(small => {
-        if (/guest(s)? available/i.test(small.textContent) && small.textContent !== 'Available') {
-          small.textContent = 'Available'
-        }
-      })
+  document.querySelectorAll('.slot small').forEach(small => {
+    if (/guest(s)? available/i.test(small.textContent) && small.textContent !== 'Available') {
+      small.textContent = 'Available'
     }
+  })
+}
 
     const form = document.querySelector('#publicBookingForm')
     if (!form) return
