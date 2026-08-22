@@ -12,7 +12,6 @@
     <link rel="stylesheet" href="/src/public-ui.css" />
     <link rel="stylesheet" href="/src/customer-view.css" />
     <link rel="stylesheet" href="/src/reservations-management-shell.css" />
-    <link rel="stylesheet" href="/src/public-business-presentation.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TerraPeak Reservations</title>
   </head>
@@ -43,7 +42,6 @@
         await import('/src/public-booking.js')
         await import('/src/public-customer-form.js')
         await import('/src/public-booking-flow.js')
-        await import('/src/public-business-presentation.js')
       } else {
         await import('/src/customer-auth-bootstrap.js')
         if (RESERVATIONS_MANAGEMENT_ROUTE_SET.has(currentRoute) && window.__TERRAPEAK_RESERVATIONS_READY__ === true) {
