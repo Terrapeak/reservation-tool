@@ -11,8 +11,17 @@ alter table public.reservation_business_settings
   add constraint reservation_business_settings_callback_notifications_check
   check (
     jsonb_typeof(callback_notifications) = 'object'
-    and coalesce((callback_notifications->>'enabled')::boolean, true) in (true, false)
-    and coalesce(callback_notifications->>'recipient_mode', 'owner_admin') = 'owner_admin'
+    and (
+      not (callback_notifications ? 'enabled')
+      or jsonb_typeof(callback_notifications->'enabled') = 'boolean'
+    )
+    and (
+      not (callback_notifications ? 'recipient_mode')
+      or (
+        jsonb_typeof(callback_notifications->'recipient_mode') = 'string'
+        and callback_notifications->>'recipient_mode' = 'owner_admin'
+      )
+    )
   );
 
 comment on column public.reservation_business_settings.callback_notifications is
@@ -31,7 +40,7 @@ as $$
 declare
   canonical_default jsonb := '{"enabled": true, "recipient_mode": "owner_admin"}'::jsonb;
 begin
-  if current_user = 'service_role' then
+  if current_setting('request.jwt.claim.role', true) = 'service_role' then
     return new;
   end if;
 
