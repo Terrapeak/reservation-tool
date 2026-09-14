@@ -22,3 +22,13 @@ test('settings UI uses the existing authenticated reservation settings write pat
   assert.doesNotMatch(source, /selected company members|recipientUserIds|email input/i)
 })
 
+test('callback preference authorization is narrow and covers insert/update paths', async () => {
+  const migration = await read('../supabase/migrations/20260914100000_callback_notification_preferences.sql')
+  assert.match(migration, /private\.has_business_role\(new\.business_id, array\['owner', 'admin'\]\)/)
+  assert.match(migration, /before insert or update of callback_notifications/i)
+  assert.match(migration, /new\.callback_notifications is not distinct from old\.callback_notifications/i)
+  assert.match(migration, /current_user = 'service_role'/i)
+  assert.match(migration, /using errcode = '42501'/i)
+  assert.doesNotMatch(migration, /drop policy.*reservation_business_settings_manager_update/i)
+})
+
