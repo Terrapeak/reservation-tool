@@ -1,0 +1,26 @@
+name: Temporary D1 Reservations validation
+
+on:
+  push:
+    branches: [callback-notification-preferences-current-main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: node --check src/restaurant-settings.js
+      - run: git diff --check d7f6bcd1d8879bc1acdfc3519ae15b5d21492272 HEAD
+      - run: |
+          if rg -n --hidden --glob '!node_modules/**' --glob '!package-lock.json' '(SUPABASE_SERVICE_ROLE_KEY|AIza[0-9A-Za-z_-]{20,}|mongodb\+srv://[^[:space:]]+)' src/restaurant-settings.js supabase/migrations/20260914100000_callback_notification_preferences.sql tests/callback-notification-preferences.test.js; then
+            exit 1
+          fi
