@@ -73,7 +73,7 @@ test('all canonical feature routes use the same shell navigation', async () => {
     assert.ok(RESERVATIONS_MANAGEMENT_ROUTE_SET.has(RESERVATIONS_MANAGEMENT_ROUTES[route]))
   }
   assert.match(entry, /reservations-management-shell\.js/)
-  assert.match(shell, /RESERVATIONS_NAVIGATION\.map/)
+  assert.match(shell, /getVisibleNavigation\(RESERVATIONS_NAVIGATION, capabilities\)/)
 })
 
 test('Customer Form uses canonical dropdown fields with editable options and atomic persistence', async () => {
