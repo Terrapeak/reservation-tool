@@ -26,11 +26,11 @@ test('canonical navigation keys and ordering are unique and stable', () => {
     RESERVATIONS_NAVIGATION.map(item => item.route),
     [
       'admin',
-      'admin/analytics',
       'admin/services',
       'admin/staff',
       'admin/schedule',
       'admin/availability',
+      'admin/analytics',
       'admin/customer-form',
       'admin/settings',
     ],
@@ -98,7 +98,7 @@ test('capability filtering keeps conditional destinations hidden', () => {
       teamResources: false,
       scheduledSessions: false,
     }).map(item => item.key),
-    ['bookings', 'analytics', 'customerForm', 'bookingSettings'],
+    ['bookings', 'availability', 'analytics', 'customerForm', 'bookingSettings'],
   )
 })
 
