@@ -1,0 +1,41 @@
+name: Temporary Reservations E1 Validation
+
+on:
+  push:
+    branches:
+      - reservations-canonical-navigation-contract
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: reservations-canonical-navigation-contract
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do node --check "$file"; done < <(find src tests -type f -name '*.js' -print)
+      - name: Diff check
+        run: git diff --check origin/main...HEAD
+      - name: Secret scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=$(git diff --name-only origin/main...HEAD)
+          if [ -n "$files" ] && rg -n -i '(service_role|supabase[_-]?key|api[_-]?key|secret|password|token)' $files; then
+            echo "Potential secret-like content found in feature diff"
+            exit 1
+          fi
