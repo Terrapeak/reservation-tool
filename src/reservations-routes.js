@@ -104,7 +104,7 @@ const CANONICAL_NAVIGATION_CONTRACT = [
   },
   {
     key: 'bookingSettings',
-    label: 'Settings',
+    label: 'Booking Settings',
     route: RESERVATIONS_MANAGEMENT_ROUTES.settings,
     group: 'BOOKING_SETUP',
     order: 80,

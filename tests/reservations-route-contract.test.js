@@ -37,12 +37,14 @@ test('the unified shell owns exactly the canonical navigation', async () => {
     'Availability',
     'Analytics',
     'Customer Form',
-    'Settings',
+    'Booking Settings',
   ])
   assert.equal(new Set(labels).size, 8)
   assert.doesNotMatch(labels.join('|'), /Overview/)
   assert.match(shell, /RESERVATIONS_NAVIGATION/)
   assert.match(shell, /reservations-shell-nav/)
+  assert.match(shell, /reservations-nav-group/)
+  assert.match(shell, /NAVIGATION_GROUP_LABELS/)
   assert.doesNotMatch(enhancer, /installUnifiedReservationsNavigation/)
   assert.doesNotMatch(enhancer, /\['Overview',/)
 })

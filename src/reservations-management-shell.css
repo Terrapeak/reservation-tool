@@ -43,13 +43,34 @@
 }
 
 .reservations-shell-nav {
-  display: flex;
-  gap: 6px;
+  display: grid;
+  gap: 14px;
   overflow-x: auto;
   padding: 10px 16px;
   border-bottom: 1px solid #e2e8f0;
   background: #fff;
   -webkit-overflow-scrolling: touch;
+}
+
+
+.reservations-nav-group {
+  display: grid;
+  gap: 4px;
+}
+
+.reservations-nav-group h2 {
+  margin: 0 4px;
+  color: #6b7b90;
+  font-size: 0.7rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.reservations-nav-group-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .reservations-shell-nav a {
