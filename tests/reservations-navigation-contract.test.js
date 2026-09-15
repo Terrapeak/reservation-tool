@@ -37,6 +37,13 @@ test('canonical navigation keys and ordering are unique and stable', () => {
   )
 })
 
+test('current landing remains the Bookings management route', () => {
+  const landing = RESERVATIONS_NAVIGATION.find(item => item.isLanding)
+  assert.equal(landing?.key, 'bookings')
+  assert.equal(landing?.route, RESERVATIONS_MANAGEMENT_ROUTES.bookings)
+  assert.equal(landing?.conceptualArea, 'overview')
+})
+
 test('canonical contract carries valid grouping and product metadata', () => {
   const groups = new Set(['OPERATIONS', 'INSIGHTS', 'BOOKING_SETUP', 'BOOKING_PAGE'])
   for (const item of RESERVATIONS_NAVIGATION_CONTRACT) {
