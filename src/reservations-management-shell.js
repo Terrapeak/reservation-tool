@@ -49,7 +49,7 @@ function routeLabel(route) {
   if (canonical.endsWith('/schedule')) return 'Scheduled'
   if (canonical.endsWith('/availability')) return 'Availability'
   if (canonical.endsWith('/analytics')) return 'Analytics'
-  if (canonical.endsWith('/settings')) return 'Settings'
+  if (canonical.endsWith('/settings')) return 'Booking Settings'
   return 'Bookings'
 }
 
@@ -78,7 +78,11 @@ function buildNavigation(activeRoute, capabilities = {}) {
     }
   }
 
-  return groups.map(group => {
+  const groupOrder = ['OPERATIONS', 'INSIGHTS', 'BOOKING_SETUP', 'BOOKING_PAGE']
+  return groupOrder
+    .map(key => groups.find(group => group.key === key))
+    .filter(Boolean)
+    .map(group => {
     const links = group.items.map(({ label, route }) => {
       const path = route === 'admin' ? base : `${base}/${route.replace(/^admin\//, '')}`
       const hrefRoute = path.split('/').slice(2).join('/') || 'dashboard'
