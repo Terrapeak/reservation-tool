@@ -49,7 +49,7 @@ function routeLabel(route) {
   if (canonical.endsWith('/schedule')) return 'Scheduled'
   if (canonical.endsWith('/availability')) return 'Availability'
   if (canonical.endsWith('/analytics')) return 'Analytics'
-  if (canonical.endsWith('/settings')) return 'Settings'
+  if (canonical.endsWith('/settings')) return 'Booking Settings'
   return 'Bookings'
 }
 
@@ -59,15 +59,38 @@ function customerManagementHref(path) {
   return `${url.pathname}${url.search}`
 }
 
+const NAVIGATION_GROUP_LABELS = Object.freeze({
+  OPERATIONS: 'Operations',
+  INSIGHTS: 'Insights',
+  BOOKING_SETUP: 'Booking Setup',
+  BOOKING_PAGE: 'Booking Page',
+})
+
 function buildNavigation(activeRoute, capabilities = {}) {
   const base = `/${businessSlug}/dashboard`
-  // The canonical registry remains the only source; capability filtering wraps RESERVATIONS_NAVIGATION.map.
-  return getVisibleNavigation(RESERVATIONS_NAVIGATION, capabilities).map(({ label, route }) => {
-    const path = route === 'admin' ? base : `${base}/${route.replace(/^admin\//, '')}`
-    const hrefRoute = path.split('/').slice(2).join('/') || 'dashboard'
-    const active = canonicalRoute(activeRoute) === hrefRoute
-    const href = customerManagementHref(path)
-    return `<a href="${href}" ${active ? 'class="active" aria-current="page"' : ''}>${label}</a>`
+  const groups = []
+  for (const item of getVisibleNavigation(RESERVATIONS_NAVIGATION, capabilities)) {
+    const group = groups.find(entry => entry.key === item.group)
+    if (group) {
+      group.items.push(item)
+    } else {
+      groups.push({ key: item.group, label: NAVIGATION_GROUP_LABELS[item.group] || item.group, items: [item] })
+    }
+  }
+
+  const groupOrder = ['OPERATIONS', 'INSIGHTS', 'BOOKING_SETUP', 'BOOKING_PAGE']
+  return groupOrder
+    .map(key => groups.find(group => group.key === key))
+    .filter(Boolean)
+    .map(group => {
+    const links = group.items.map(({ label, route }) => {
+      const path = route === 'admin' ? base : `${base}/${route.replace(/^admin\//, '')}`
+      const hrefRoute = path.split('/').slice(2).join('/') || 'dashboard'
+      const active = canonicalRoute(activeRoute) === hrefRoute
+      const href = customerManagementHref(path)
+      return `<a href="${href}" ${active ? 'class="active" aria-current="page"' : ''}>${label}</a>`
+    }).join('')
+    return `<section class="reservations-nav-group" aria-labelledby="reservations-nav-group-${group.key.toLowerCase()}"><h2 id="reservations-nav-group-${group.key.toLowerCase()}">${group.label}</h2><div class="reservations-nav-group-items">${links}</div></section>`
   }).join('')
 }
 

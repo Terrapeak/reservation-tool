@@ -37,12 +37,14 @@ test('the unified shell owns exactly the canonical navigation', async () => {
     'Availability',
     'Analytics',
     'Customer Form',
-    'Settings',
+    'Booking Settings',
   ])
   assert.equal(new Set(labels).size, 8)
   assert.doesNotMatch(labels.join('|'), /Overview/)
   assert.match(shell, /RESERVATIONS_NAVIGATION/)
   assert.match(shell, /reservations-shell-nav/)
+  assert.match(shell, /reservations-nav-group/)
+  assert.match(shell, /NAVIGATION_GROUP_LABELS/)
   assert.doesNotMatch(enhancer, /installUnifiedReservationsNavigation/)
   assert.doesNotMatch(enhancer, /\['Overview',/)
 })
@@ -71,7 +73,7 @@ test('all canonical feature routes use the same shell navigation', async () => {
     assert.ok(RESERVATIONS_MANAGEMENT_ROUTE_SET.has(RESERVATIONS_MANAGEMENT_ROUTES[route]))
   }
   assert.match(entry, /reservations-management-shell\.js/)
-  assert.match(shell, /RESERVATIONS_NAVIGATION\.map/)
+  assert.match(shell, /getVisibleNavigation\(RESERVATIONS_NAVIGATION, capabilities\)/)
 })
 
 test('Customer Form uses canonical dropdown fields with editable options and atomic persistence', async () => {
