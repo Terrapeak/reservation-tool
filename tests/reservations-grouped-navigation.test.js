@@ -58,3 +58,11 @@ test('capability filtering still hides Services, Team and Scheduled only when di
     'bookingSettings',
   ])
 })
+
+
+test('shell active state uses exact canonical route matching', async () => {
+  const shell = await readFile(shellUrl, 'utf8')
+  assert.match(shell, /canonicalRoute\(activeRoute\) === hrefRoute/)
+  assert.doesNotMatch(shell, /startsWith\(hrefRoute\)/)
+  assert.match(shell, /hrefRoute = path\.split\('\/'\)\.slice\(2\)\.join\('\/'\) \|\| 'dashboard'/)
+})
