@@ -14,11 +14,11 @@ test('canonical navigation keys and ordering are unique and stable', () => {
   assert.equal(new Set(keys).size, keys.length)
   assert.deepEqual(keys, [
     'bookings',
-    'analytics',
     'services',
     'staff',
     'schedule',
     'availability',
+    'analytics',
     'customerForm',
     'bookingSettings',
   ])
@@ -90,7 +90,7 @@ test('capability filtering keeps conditional destinations hidden', () => {
   })
   assert.deepEqual(
     navigation.map(item => item.key),
-    ['bookings', 'analytics', 'customerForm', 'bookingSettings'],
+    ['bookings', 'availability', 'analytics', 'customerForm', 'bookingSettings'],
   )
   assert.deepEqual(
     getVisibleNavigation(RESERVATIONS_NAVIGATION, {
