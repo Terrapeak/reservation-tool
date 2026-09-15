@@ -182,8 +182,8 @@ export const getReservationsNavigation = ({
   .sort((a, b) => a.order - b.order)
 
 export const RESERVATIONS_NAVIGATION = Object.freeze(
-  getReservationsNavigation().map(({ key, label, route, group, order, productArea, requiredCapability }) =>
-    freezeNavigationItem({ key, label, route, group, order, productArea, requiredCapability }),
+  getReservationsNavigation().map(({ key, label, route, group, order, productArea, requiredCapability, isLanding, conceptualArea }) =>
+    freezeNavigationItem({ key, label, route, group, order, productArea, requiredCapability, isLanding, conceptualArea }),
   ),
 )
 
