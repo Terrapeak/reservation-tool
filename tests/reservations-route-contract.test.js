@@ -83,6 +83,8 @@ test('Customer Form uses canonical dropdown fields with editable options and ato
   assert.match(form, /CUSTOMER_FIELD_TYPES/)
   assert.match(form, /draft-options/)
   assert.match(form, /save_booking_customer_form/)
+  assert.match(form, /applySavedDraft/)
+  assert.match(form, /hasLoadedSavedDraft/)
   assert.doesNotMatch(form, /\.from\('booking_custom_fields'\)\.update\(payload\)/)
   assert.match(runtime, /save_booking_customer_form:'manageSettings'/)
   assert.match(runtime, /p_business_id:trustedBusinessId/)

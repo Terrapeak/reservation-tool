@@ -1,6 +1,7 @@
 import { supabase } from './supabaseclient.js'
 import { resolveReservationsConfiguration } from './reservation-configuration.js'
 import { formValues, normalizeCustomerForm, serializeCustomerFormAnswers, validateCustomerForm, renderCustomerFormField } from './customer-form-contract.js'
+import { augmentCustomerFormRpcArgs } from './customer-form-rpc-contract.js'
 import { buildCustomerJourney, filterRestaurantSlotsForPartySize, isCustomerVisibleService, resolveJourneyConfiguration, restaurantPartySizeRange, scheduledRegistrationPresentation } from './reservation-journey.js'
 import { loadPublicReservationsConfiguration } from './reservation-settings-access.js'
 import {
@@ -93,11 +94,21 @@ async function servicePage(business,service){
 }
 async function restaurantServicePage(business,service){
   const today=new Date(), max=new Date(); max.setDate(max.getDate()+60)
-  const settingsResult=await supabase.from('restaurant_settings').select('max_guests_per_slot').eq('business_id',business.id).maybeSingle()
+  const [settingsResult,customerFieldsResult]=await Promise.all([
+    supabase.from('restaurant_settings').select('max_guests_per_slot').eq('business_id',business.id).maybeSingle(),
+    supabase.rpc('get_public_booking_custom_fields',{p_business_slug:business.business_slug})
+  ])
   if(settingsResult.error||!settingsResult.data){reportPublicQueryError('restaurant settings',settingsResult.error);return fail('Restaurant settings could not be loaded.')}
+  if(customerFieldsResult.error){reportPublicQueryError('customer form',customerFieldsResult.error);return fail('Customer Form could not be loaded.')}
+  const customerFields=normalizeCustomerForm(publicRows(customerFieldsResult.data),{activeOnly:true})
+  const system=Object.fromEntries(customerFields.filter(field=>field.system_key).flatMap(field=>[[field.system_key,field],[field.system_key==='name'?'customer_name':field.system_key==='phone'?'customer_phone':field.system_key==='email'?'customer_email':field.system_key,field]]))
+  const customFields=customerFields.filter(field=>!field.system_key)
+  const nameLabel=esc(system.customer_name?.field_label||'Name')+(system.customer_name?.is_required===false?'':' *')
+  const phoneLabel=esc(system.customer_phone?.field_label||'Phone')+(system.customer_phone?.is_required===false?'':' *')
+  const emailMarkup=system.customer_email?renderCustomerFormField(system.customer_email,'email'):''
   const partyRange=restaurantPartySizeRange(settingsResult.data.max_guests_per_slot)
   const crumb=business.reservationConfiguration.capabilities.services===false?'':'<a href="/book/'+esc(business.business_slug)+'">Services</a><span>/</span><span>'+esc(service.name)+'</span>'
-  shell(business,'<section class="booking-hero compact"><p class="booking-kicker">'+esc(business.reservationConfiguration.terminology.bookingSingular)+'</p><h1>Choose your party and time</h1><p>Choose your party size, date and available time.</p></section><section class="calendar-panel restaurant-party-size"><div><label for="partySize">Number of guests</label><input id="partySize" type="number" min="'+partyRange.min+'" max="'+partyRange.max+'" value="1" required><p>Up to '+partyRange.max+' guests per table.</p></div></section><section class="calendar-panel"><div><label for="bookingDate">Choose a date</label><input id="bookingDate" type="date" min="'+dateValue(today)+'" max="'+dateValue(max)+'" value="'+dateValue(today)+'"><p id="restaurantTimezone" class="timezone"></p></div><div><h2>Available times</h2><div id="availableSlots" class="slot-grid"></div></div></section><form id="publicBookingForm" class="booking-form" hidden><h2>Guest details</h2><p id="selectedTime"></p><div class="form-grid"><label>Name<input name="name" required maxlength="200"></label><label>Phone<input name="phone" required maxlength="50"></label></div><label>Special requests<textarea name="notes" maxlength="2000"></textarea></label><button class="booking-confirm" type="submit">Confirm reservation</button><p id="bookingMessage" role="status"></p></form>',crumb)
+  shell(business,'<section class="booking-hero compact"><p class="booking-kicker">'+esc(business.reservationConfiguration.terminology.bookingSingular)+'</p><h1>Choose your party and time</h1><p>Choose your party size, date and available time.</p></section><section class="calendar-panel restaurant-party-size"><div><label for="partySize">Number of guests</label><input id="partySize" type="number" min="'+partyRange.min+'" max="'+partyRange.max+'" value="1" required><p>Up to '+partyRange.max+' guests per table.</p></div></section><section class="calendar-panel"><div><label for="bookingDate">Choose a date</label><input id="bookingDate" type="date" min="'+dateValue(today)+'" max="'+dateValue(max)+'" value="'+dateValue(today)+'"><p id="restaurantTimezone" class="timezone"></p></div><div><h2>Available times</h2><div id="availableSlots" class="slot-grid"></div></div></section><form id="publicBookingForm" class="booking-form" hidden><h2>Guest details</h2><p id="selectedTime"></p><div class="form-grid"><label>'+nameLabel+'<input name="name" '+(system.customer_name?.is_required===false?'':'required')+' maxlength="200"></label><label>'+phoneLabel+'<input name="phone" '+(system.customer_phone?.is_required===false?'':'required')+' maxlength="50"></label>'+emailMarkup+customFields.map(customFieldMarkup).join('')+'</div><label>Special requests<textarea name="notes" maxlength="2000"></textarea></label><button class="booking-confirm" type="submit">Confirm reservation</button><p id="bookingMessage" role="status"></p></form>',crumb)
   const party=document.querySelector('#partySize'),date=document.querySelector('#bookingDate'),slots=document.querySelector('#availableSlots'),form=document.querySelector('#publicBookingForm'),timezone=document.querySelector('#restaurantTimezone')
   let selected=null
   async function load(){
@@ -117,8 +128,11 @@ async function restaurantServicePage(business,service){
     event.preventDefault();if(!selected)return
     const values=new FormData(form),button=form.querySelector('[type="submit"]'),message=document.querySelector('#bookingMessage'),quantity=Number(party.value)
     if(!Number.isInteger(quantity)||quantity<partyRange.min||quantity>partyRange.max||quantity>selected.capacity){message.textContent='Choose a guest count within the available capacity.';return}
+    const formFieldValues=formValues(form,customerFields),answers=customFieldAnswers(form,customerFields),validation=validateCustomerForm(customerFields,formFieldValues)
+    if(validation){message.textContent=validation;return}
     button.disabled=true;message.textContent='Confirming…'
-    const {data,error}=await supabase.rpc('create_public_restaurant_reservation',{p_business_slug:business.business_slug,p_customer_name:values.get('name'),p_phone:values.get('phone'),p_reservation_date:date.value,p_reservation_time:selected.time,p_party_size:quantity,p_special_request:values.get('notes')||null,p_custom_data:{}})
+    const payload=augmentCustomerFormRpcArgs('create_public_restaurant_reservation',{p_business_slug:business.business_slug,p_customer_name:values.get('name'),p_phone:values.get('phone'),p_reservation_date:date.value,p_reservation_time:selected.time,p_party_size:quantity,p_special_request:values.get('notes')||null,p_custom_data:{}},{name:values.get('name'),email:values.get('email')||null,phone:values.get('phone')},answers)
+    const {data,error}=await supabase.rpc('create_public_restaurant_reservation',payload)
     button.disabled=false
     if(error){message.textContent=error.message.includes('capacity')||error.message.includes('available')?'That time no longer has enough capacity. Please choose again.':'Reservation could not be completed.';return}
     form.innerHTML='<div class="booking-success"><p class="booking-kicker">Reservation confirmed</p><h2>Thank you, '+esc(values.get('name'))+'.</h2><p>Your table for '+quantity+' has been reserved.</p><p>Your reference is <strong>'+esc(data)+'</strong>.</p></div>'

@@ -111,6 +111,17 @@ test('learning centre enquiries render and retain saved Customer Form fields', a
   assert.match(migration, /Complete all required customer form fields/)
 })
 
+test('restaurant reservations render and submit saved Customer Form fields', async () => {
+  const source = await read('../src/public-booking.js')
+  assert.match(source, /async function restaurantServicePage/)
+  assert.match(source, /supabase\.rpc\('get_public_booking_custom_fields',\{p_business_slug:business\.business_slug\}\)/)
+  assert.match(source, /customFields\.map\(customFieldMarkup\)\.join\(''\)/)
+  assert.match(source, /validateCustomerForm\(customerFields,formFieldValues\)/)
+  assert.match(source, /augmentCustomerFormRpcArgs\('create_public_restaurant_reservation'/)
+  assert.match(source, /const payload=augmentCustomerFormRpcArgs\('create_public_restaurant_reservation'[\s\S]*,answers\)/)
+  assert.match(source, /supabase\.rpc\('create_public_restaurant_reservation',payload\)/)
+})
+
 test('archived services remain discoverable and can be restored', async () => {
   const source = await read('../src/universal-booking-admin.js')
   const migration = await read('../supabase/migrations/20260819093000_restore_archived_services.sql')
