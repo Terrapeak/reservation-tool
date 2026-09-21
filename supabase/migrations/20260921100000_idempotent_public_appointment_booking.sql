@@ -150,9 +150,6 @@ end;
 $$;
 
 revoke all on function public.create_public_booking_idempotent(
-  text, text, text, timestamptz, text, text, text, text, jsonb, text
-) from public;
-revoke all on function public.create_public_booking_idempotent(
   text, text, text, timestamptz, text, text, text, text, jsonb, text, text
 ) from public;
 grant execute on function public.create_public_booking_idempotent(
