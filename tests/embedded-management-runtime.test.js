@@ -18,8 +18,9 @@ function withoutImports(source) {
   return source.replace(/\r\n?/g, '\n')
     .replace(/import \{\n  RESERVATIONS_MANAGEMENT_ROUTE_SET,\n  RESERVATIONS_NAVIGATION,\n\} from '\.\/reservations-routes\.js'\n/, '')
     .replace(/import \{ supabase \} from '\.\/supabaseclient\.js'\n/, '')
-    .replace(/import \{ getVisibleNavigation, resolveJourneyConfiguration \} from '\.\/reservation-journey\.js'\n/, '')
+    .replace(/import \{ getVisibleNavigation \} from '\.\/reservation-journey\.js'\n/, '')
     .replace(/import \{ loadTenantReservationsSettings \} from '\.\/reservation-settings-access\.js'\n/, '')
+    .replace(/import \{ resolveReservationsGovernance \} from '\.\/reservation-governance-ui\.js'\n/, '')
 }
 
 async function runShellForRoute(source, route) {
@@ -39,13 +40,13 @@ async function runShellForRoute(source, route) {
   const execute = new AsyncFunction(
     'window', 'document', 'MutationObserver', 'URLSearchParams',
     'RESERVATIONS_MANAGEMENT_ROUTE_SET', 'RESERVATIONS_NAVIGATION', 'supabase',
-    'getVisibleNavigation', 'resolveJourneyConfiguration', 'loadTenantReservationsSettings',
+    'getVisibleNavigation', 'resolveJourneyConfiguration', 'loadTenantReservationsSettings', 'resolveReservationsGovernance',
     `${withoutImports(source)}\nreturn installUnifiedManagementShell;`,
   )
   const installUnifiedManagementShell = await execute(
     window, document, MutationObserver, URLSearchParams,
     new Set(['admin', 'admin/analytics', 'admin/settings', 'admin/customer-form']), [], {},
-    () => [], () => ({ capabilities: {} }), async () => ({}),
+    () => [], () => ({ capabilities: {} }), async () => ({}), () => ({ effectiveCapabilities: {} }),
   )
   await installUnifiedManagementShell()
 }

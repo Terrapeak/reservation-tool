@@ -1,7 +1,7 @@
 import { RESERVATIONS_MANAGEMENT_ROUTE_SET, RESERVATIONS_ROUTE_GROUPS } from './reservations-routes.js'
 import { supabase } from './supabaseclient.js'
-import { resolveJourneyConfiguration } from './reservation-journey.js'
 import { loadTenantReservationsSettings } from './reservation-settings-access.js'
+import { resolveReservationsGovernance } from './reservation-governance-ui.js'
 
 const runtime = window.__TERRAPEAK_RESERVATIONS_RUNTIME__
 
@@ -23,7 +23,7 @@ let routeDisabled = false
 if (capabilityForRoute && route !== 'admin') {
   try {
     const settings = await loadTenantReservationsSettings(supabase, runtime.businessId, 'template_key,capabilities,terminology')
-    routeDisabled = resolveJourneyConfiguration(settings, {}).capabilities[capabilityForRoute] === false
+    routeDisabled = resolveReservationsGovernance(runtime, settings, {}).effectiveCapabilities[capabilityForRoute] === false
   } catch (error) {
     const app = document.querySelector('#app')
     if (app) app.innerHTML = '<main class="reservations-management"><h1>Reservations unavailable</h1><p role="alert"></p></main>'

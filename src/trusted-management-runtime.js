@@ -87,5 +87,21 @@ if (isCustomerManagement) {
   }
   supabase.auth.signInWithPassword = async () => denied('Reservations management authentication is controlled by TerraPeak.')
 
-  window.__TERRAPEAK_RESERVATIONS_RUNTIME__ = Object.freeze({businessId:trustedBusinessId,businessSlug:trustedBusinessSlug,companyRole,compatibilityRole,capabilities,hasCapability,source:'terrapeak-dashboard'})
+  window.__TERRAPEAK_RESERVATIONS_RUNTIME__ = Object.freeze({
+    businessId:trustedBusinessId,
+    businessSlug:trustedBusinessSlug,
+    companyRole,
+    compatibilityRole,
+    capabilities,
+    templateAuthority: String(context?.templateAuthority || ''),
+    capabilitiesManagedByPlatform: context?.capabilitiesManagedByPlatform === true,
+    effectiveTemplateKey: context?.effectiveTemplateKey || '',
+    effectiveTemplateLabel: context?.effectiveTemplateLabel || '',
+    effectiveCapabilities: Object.freeze({ ...(context?.effectiveCapabilities || {}) }),
+    effectiveTerminology: Object.freeze({ ...(context?.effectiveTerminology || {}) }),
+    bookingBehavior: context?.bookingBehavior || '',
+    confirmationMessage: context?.confirmationMessage || '',
+    hasCapability,
+    source:'terrapeak-dashboard',
+  })
 }

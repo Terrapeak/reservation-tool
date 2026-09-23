@@ -7,6 +7,27 @@
   display: none !important;
 }
 
+.reservation-capability-status {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.reservation-capability-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.reservation-capability-status-row strong {
+  color: #285b3b;
+}
+
 .reservations-management-shell {
   width: 100%;
   min-height: 100%;

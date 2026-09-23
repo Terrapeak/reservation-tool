@@ -3,8 +3,9 @@ import {
   RESERVATIONS_NAVIGATION,
 } from './reservations-routes.js'
 import { supabase } from './supabaseclient.js'
-import { getVisibleNavigation, resolveJourneyConfiguration } from './reservation-journey.js'
+import { getVisibleNavigation } from './reservation-journey.js'
 import { loadTenantReservationsSettings } from './reservation-settings-access.js'
+import { resolveReservationsGovernance } from './reservation-governance-ui.js'
 
 const runtime = window.__TERRAPEAK_RESERVATIONS_RUNTIME__
 
@@ -168,7 +169,7 @@ async function installUnifiedManagementShell() {
   const businessId = Number(runtime.businessId)
   if (businessId) {
     const settings = await loadTenantReservationsSettings(supabase, businessId, 'template_key,capabilities,terminology')
-    capabilities = resolveJourneyConfiguration(settings || {}, { business_type: runtime.businessType }).capabilities
+    capabilities = resolveReservationsGovernance(runtime, settings || {}, { business_type: runtime.businessType }).effectiveCapabilities
   }
 
   if (renderUnifiedShell(root, capabilities)) return

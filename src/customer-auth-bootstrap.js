@@ -112,6 +112,14 @@ function storeTrustedContext(bootstrap) {
     businessId: Number(bootstrap.businessId),
     businessSlug: bootstrap.businessSlug,
     supabaseUserId: String(bootstrap.supabaseUserId || ''),
+    templateAuthority: String(bootstrap.templateAuthority || ''),
+    capabilitiesManagedByPlatform: bootstrap.capabilitiesManagedByPlatform === true,
+    effectiveTemplateKey: bootstrap.effectiveTemplateKey || '',
+    effectiveTemplateLabel: bootstrap.effectiveTemplateLabel || '',
+    effectiveCapabilities: Object.freeze({ ...(bootstrap.effectiveCapabilities || {}) }),
+    effectiveTerminology: Object.freeze({ ...(bootstrap.effectiveTerminology || {}) }),
+    bookingBehavior: bootstrap.bookingBehavior || '',
+    confirmationMessage: bootstrap.confirmationMessage || '',
     source: 'terrapeak-dashboard'
   })
   window.__TERRAPEAK_RESERVATIONS_READY__ = true
