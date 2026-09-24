@@ -31,6 +31,11 @@ export function normalizeCustomerFormField(field = {}) {
     is_active: field.is_active !== false,
     display_order: Number(field.display_order || 0),
     system_key: field.system_key || null,
+    field_source: ['system', 'template', 'customer', 'legacy'].includes(field.field_source)
+      ? field.field_source
+      : (field.system_key ? 'system' : 'legacy'),
+    template_key: field.template_key || null,
+    template_field_key: field.template_field_key || null,
     is_locked: Boolean(field.is_locked),
     placeholder: String(field.placeholder || ''),
     value: field.value ?? '',
