@@ -78,7 +78,7 @@ if (isCustomerManagement) {
     return protectMutations(table, originalFrom(table))
   }
 
-  const rpcCapability = Object.freeze({save_booking_customer_form:'manageSettings',update_class_service_setup_v2:'manageServices',create_scheduled_sessions:'manageAvailability',update_scheduled_session:'manageAvailability',cancel_scheduled_session:'manageAvailability',set_scheduled_booking_status:'manageBookings'})
+  const rpcCapability = Object.freeze({save_booking_customer_form:'manageSettings',update_class_service_setup_v2:'manageServices',create_class_service_setup_v3:'manageServices',update_class_service_setup_v3:'manageServices',create_scheduled_sessions:'manageAvailability',update_scheduled_session:'manageAvailability',cancel_scheduled_session:'manageAvailability',set_scheduled_booking_status:'manageBookings'})
   supabase.rpc = async (fn,args={},options) => {
     const requiredCapability = rpcCapability[fn]
     if (requiredCapability && !hasCapability(requiredCapability)) return denied(`Your TerraPeak role cannot perform ${fn.replaceAll('_',' ')}.`)

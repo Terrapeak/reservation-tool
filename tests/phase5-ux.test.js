@@ -53,8 +53,8 @@ test('cohort service editing includes the complete future timetable', async () =
 
   assert.match(source, /edit-class-day-enabled/)
   assert.match(source, /editScheduleApplyFrom/)
-  assert.match(source, /update_class_service_setup_v2/)
-  assert.match(runtime, /update_class_service_setup_v2:\s*'manageServices'/)
+  assert.match(source, /update_class_service_setup_v3/)
+  assert.match(runtime, /update_class_service_setup_v3:\s*'manageServices'/)
   assert.match(migration, /future class already has bookings/i)
   assert.match(migration, /private\.materialize_cohort_sessions/)
 })

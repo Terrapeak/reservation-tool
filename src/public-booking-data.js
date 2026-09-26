@@ -3,7 +3,7 @@ export const PUBLIC_SERVICE_PROJECTION = [
   'duration_minutes', 'slot_interval_minutes', 'buffer_before_minutes',
   'buffer_after_minutes', 'capacity', 'price', 'currency', 'is_active',
   'is_published', 'scheduling_mode', 'price_session_count',
-  'package_validity_days', 'enrollment_mode', 'cohort_start_date',
+  'package_validity_days', 'offer_as_package', 'enrollment_mode', 'cohort_start_date',
   'cohort_end_date', 'schedule_open_ended', 'enrollment_closed', 'subject',
   'is_internal',
 ].join(',')
