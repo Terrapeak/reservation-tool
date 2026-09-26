@@ -28,7 +28,9 @@ test('service reads and dashboard writers carry explicit package offering state'
   assert.match(admin, /buildServicePackagePayload\(\{ offerAsPackage/)
   assert.match(admin, /\.\.\.packagePayload, is_published/)
   assert.match(admin, /create_class_service_setup_v3/)
+  assert.match(admin, /p_capacity: payload\.capacity, p_price: payload\.price/)
   assert.match(admin, /update_class_service_setup_v3/)
+  assert.match(admin, /p_description: document\.getElementById\('editServiceDescription'\)\.value\.trim\(\) \|\| null, p_capacity: newCapacity, p_price: document\.getElementById\('editServicePrice'\)\.value \|\| null/)
   assert.match(admin, /priceSessionCount: document\.getElementById\('servicePriceSessions'\)\?\.value/)
   assert.match(admin, /service\.booking_type !== 'restaurant'/)
   assert.match(runtime, /create_class_service_setup_v3:'manageServices'/)
@@ -102,11 +104,11 @@ test('explicit state controls reload visibility, capability gating, and Restaura
 })
 
 test('class create/edit v3 payloads preserve schedule fields and explicit package state', () => {
-  const base = { p_business_id: 37, p_name: 'Class', p_schedule: [{ day_of_week: 1, starts_at: '09:00', ends_at: '10:00', staff_id: 2 }] }
+  const base = { p_business_id: 37, p_name: 'Class', p_capacity: 5, p_price: 100, p_schedule: [{ day_of_week: 1, starts_at: '09:00', ends_at: '10:00', staff_id: 2 }] }
   assert.deepEqual(buildClassPackageRpcPayload({ base, offerAsPackage: true, priceSessionCount: 4, packageValidityDays: 30 }), {
     ...base, p_price_session_count: 4, p_package_validity_days: 30, p_offer_as_package: true,
   })
-  assert.deepEqual(buildClassPackageRpcPayload({ base: { p_service_id: 28, p_schedule: base.p_schedule }, offerAsPackage: false, preserveMetadataWhenOff: true, existingPriceSessionCount: 4, existingPackageValidityDays: 30 }), {
-    p_service_id: 28, p_schedule: base.p_schedule, p_price_session_count: 4, p_package_validity_days: 30, p_offer_as_package: false,
+  assert.deepEqual(buildClassPackageRpcPayload({ base: { p_service_id: 28, p_capacity: 5, p_price: 100, p_schedule: base.p_schedule }, offerAsPackage: false, preserveMetadataWhenOff: true, existingPriceSessionCount: 4, existingPackageValidityDays: 30 }), {
+    p_service_id: 28, p_capacity: 5, p_price: 100, p_schedule: base.p_schedule, p_price_session_count: 4, p_package_validity_days: 30, p_offer_as_package: false,
   })
 })
